@@ -37,7 +37,7 @@ import (
 const (
 	defaultPollerAutoScalerCooldown          = time.Minute
 	defaultPollerAutoScalerTargetUtilization = 0.6
-	defaultMinConcurrentPollerSize           = 1
+	defaultMinConcurrentPollerSize           = 2
 )
 
 var (
