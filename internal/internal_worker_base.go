@@ -35,6 +35,7 @@ import (
 	"go.uber.org/cadence/internal/common/debug"
 	"go.uber.org/cadence/internal/worker"
 
+	"github.com/jonboulle/clockwork"
 	"github.com/uber-go/tally"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -175,13 +176,14 @@ func newBaseWorker(options baseWorkerOptions, logger *zap.Logger, metricsScope t
 
 	var concurrencyAS *worker.ConcurrencyAutoScaler
 	if pollerOptions := options.pollerAutoScaler; pollerOptions.Enabled {
-		concurrencyAS = worker.NewPollerAutoScaler(worker.ConcurrencyAutoScalerInput{
+		concurrencyAS = worker.NewConcurrencyAutoScaler(worker.ConcurrencyAutoScalerInput{
 			Concurrency:    concurrency,
 			Cooldown:       pollerOptions.Cooldown,
 			PollerMaxCount: pollerOptions.MaxCount,
 			PollerMinCount: pollerOptions.MinCount,
 			Logger:         logger,
 			Scope:          metricsScope,
+			Clock:          clockwork.NewRealClock(),
 		})
 	}
 
