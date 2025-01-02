@@ -202,7 +202,7 @@ func (c *ConcurrencyAutoScaler) updatePollerPermit() {
 		return
 	}
 	currentQuota := c.concurrency.PollerPermit.Quota()
-	newQuota := int(math.Round(float64(currentQuota) * c.pollerWaitTimeInMsLog2.Average() / targetPollerWaitTimeInMsLog2))
+	newQuota := int(math.Round(float64(currentQuota) * targetPollerWaitTimeInMsLog2 / c.pollerWaitTimeInMsLog2.Average() ))
 	if newQuota < c.pollerMinCount {
 		newQuota = c.pollerMinCount
 	}
