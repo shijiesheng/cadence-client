@@ -21,6 +21,7 @@
 package worker
 
 import (
+	"math/rand"
 	"sync"
 	"testing"
 	"time"
@@ -28,6 +29,7 @@ import (
 	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/assert"
 	"github.com/uber-go/tally"
+	"go.uber.org/atomic"
 	"go.uber.org/goleak"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest/observer"
@@ -250,44 +252,38 @@ func TestConcurrencyAutoScaler(t *testing.T) {
 
 func TestRollingAverage(t *testing.T) {
 	for _, tt := range []struct {
-		name         string
-		cap          int
-		addGoroutine int
-		input        []float64
-		expected     []float64
+		name     string
+		cap      int
+		input    []float64
+		expected []float64
 	}{
 		{
 			"cap is 0",
 			0,
-			5,
 			[]float64{1, 2, 3, 4, 5, 6, 7},
 			[]float64{0, 0, 0, 0, 0, 0, 0},
 		},
 		{
 			"cap is 1",
 			1,
-			5,
 			[]float64{1, 2, 3, 4, 5, 6, 7},
 			[]float64{1, 2, 3, 4, 5, 6, 7},
 		},
 		{
 			"cap is 2",
 			2,
-			5,
 			[]float64{1, 2, 3, 4, 5, 6, 7},
 			[]float64{1, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5},
 		},
 		{
 			"cap is 3",
 			3,
-			5,
 			[]float64{1, 2, 3, 4, 5, 6, 7},
 			[]float64{1, 1.5, 2, 3, 4, 5, 6},
 		},
 		{
 			"cap is 4",
 			4,
-			5,
 			[]float64{1, 2, 3, 4, 5, 6, 7},
 			[]float64{1, 1.5, 2, 2.5, 3.5, 4.5, 5.5},
 		},
@@ -295,29 +291,34 @@ func TestRollingAverage(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			defer goleak.VerifyNone(t)
 			r := newRollingAverage(tt.cap)
-
-			doneC := make(chan struct{})
-
-			inputChan := make(chan float64)
-			var wg sync.WaitGroup
-			for i := 0; i < tt.addGoroutine; i++ {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					for v := range inputChan {
-						r.Add(v)
-						doneC <- struct{}{}
-					}
-				}()
-			}
-
 			for i := range tt.input {
-				inputChan <- tt.input[i]
-				<-doneC
+				r.Add(tt.input[i])
 				assert.Equal(t, tt.expected[i], r.Average())
 			}
-			close(inputChan)
-			wg.Wait()
 		})
 	}
+}
+
+func TestRollingAverage_Race(t *testing.T) {
+	total := 100000
+	r := newRollingAverage(total)
+	trueSum := atomic.NewFloat64(0)
+	var wg sync.WaitGroup
+	for i := 0; i < total; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			time.Sleep(time.Millisecond * time.Duration(rand.Intn(10)))
+			v := rand.Float64()
+			r.Add(v)
+			trueSum.Add(v)
+			time.Sleep(time.Millisecond * time.Duration(rand.Intn(10)))
+			r.Average()
+		}()
+	}
+
+	wg.Wait()
+
+	// sanity check
+	assert.InDelta(t, trueSum.Load()/float64(total), r.Average(), 0.001)
 }
