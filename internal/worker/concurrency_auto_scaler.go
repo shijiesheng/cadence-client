@@ -23,7 +23,6 @@ package worker
 import (
 	"math"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/jonboulle/clockwork"
@@ -31,11 +30,11 @@ import (
 	"go.uber.org/zap"
 
 	"go.uber.org/cadence/.gen/go/shared"
+	"go.uber.org/cadence/internal/common/metrics"
 )
 
 const (
 	defaultAutoScalerUpdateTick = time.Second
-	// concurrencyAutoScalerObservabilityTick = time.Millisecond * 500
 	targetPollerWaitTimeInMsLog2  = 4 // 16 ms
 	numberOfPollsInRollingAverage = 20
 
@@ -50,6 +49,11 @@ const (
 	autoScalerEventStop                                       = "stop"
 	autoScalerEventLogMsg                     string          = "concurrency auto scaler event"
 	testTimeFormat                            string          = "15:04:05"
+
+	metricsEnabled = "enabled"
+	metricsDisabled = "disabled"
+	metricsPollerQuota = "poller-quota"
+	metricsPollerWaitTime = "poller-wait-time"
 )
 
 type (
@@ -64,14 +68,15 @@ type (
 		cooldown    time.Duration
 		updateTick  time.Duration
 
-		// enable auto scaler on concurrency or not
-		enable atomic.Bool
+		// state of autoscaler
+		lock sync.RWMutex
+		enabled bool
 
 		// poller
 		pollerInitCount        int
 		pollerMaxCount         int
 		pollerMinCount         int
-		pollerWaitTimeInMsLog2 *rollingAverage // log2(pollerWaitTimeInMs+1) for smoothing (ideal value is 0)
+		pollerWaitTime  *rollingAverage[time.Duration]
 		pollerPermitLastUpdate time.Time
 	}
 
@@ -98,15 +103,15 @@ func NewConcurrencyAutoScaler(input ConcurrencyAutoScalerInput) *ConcurrencyAuto
 		shutdownChan:           make(chan struct{}),
 		concurrency:            input.Concurrency,
 		cooldown:               input.Cooldown,
-		log:                    input.Logger,
-		scope:                  input.Scope,
+		log:                    input.Logger.Named(metrics.ConcurrencyAutoScalerScope),
+		scope:                  input.Scope.SubScope(metrics.ConcurrencyAutoScalerScope),
 		clock:                  input.Clock,
 		updateTick:             tick,
-		enable:                 atomic.Bool{}, // initial value should be false and is only turned on from auto config hint
+		enabled:                false, // initial value should be false and is only turned on from auto config hint
 		pollerInitCount:        input.Concurrency.PollerPermit.Quota(),
 		pollerMaxCount:         input.PollerMaxCount,
 		pollerMinCount:         input.PollerMinCount,
-		pollerWaitTimeInMsLog2: newRollingAverage(numberOfPollsInRollingAverage),
+		pollerWaitTime: newRollingAverage[time.Duration](numberOfPollsInRollingAverage),
 		pollerPermitLastUpdate: input.Clock.Now(),
 	}
 }
@@ -126,7 +131,9 @@ func (c *ConcurrencyAutoScaler) Start() {
 				return
 			case <-ticker.Chan():
 				c.logEvent(autoScalerEventMetrics)
+				c.lock.Lock()
 				c.updatePollerPermit()
+				c.lock.Unlock()
 			}
 		}
 	}()
@@ -138,27 +145,27 @@ func (c *ConcurrencyAutoScaler) Stop() {
 	c.logEvent(autoScalerEventStop)
 }
 
-// ProcessPollerHint reads the poller response hint and take actions
+// ProcessPollerHint reads the poller response hint and take actions in a transactional way
 // 1. update poller wait time
 // 2. enable/disable auto scaler
 func (c *ConcurrencyAutoScaler) ProcessPollerHint(hint *shared.AutoConfigHint) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
 	if hint == nil {
-		c.log.Warn("auto config hint is nil, this results in no action")
 		return
 	}
 	if hint.PollerWaitTimeInMs != nil {
 		waitTimeInMs := *hint.PollerWaitTimeInMs
-		c.pollerWaitTimeInMsLog2.Add(math.Log2(float64(waitTimeInMs + 1)))
+		c.pollerWaitTime.Add(time.Millisecond*time.Duration(waitTimeInMs))
 	}
 
-	/*
-		Atomically compare and switch the auto scaler enable flag. If auto scaler is turned off, IMMEDIATELY reset the concurrency limits.
-	*/
 	var shouldEnable bool
 	if hint.EnableAutoConfig != nil && *hint.EnableAutoConfig {
 		shouldEnable = true
 	}
-	if switched := c.enable.CompareAndSwap(!shouldEnable, shouldEnable); switched {
+	if shouldEnable != c.enabled { // flag switched
+		c.enabled = shouldEnable
 		if shouldEnable {
 			c.logEvent(autoScalerEventEnable)
 		} else {
@@ -174,25 +181,23 @@ func (c *ConcurrencyAutoScaler) resetConcurrency() {
 }
 
 func (c *ConcurrencyAutoScaler) logEvent(event autoScalerEvent) {
-	if c.enable.Load() {
-		c.scope.Counter("concurrency_auto_scaler.enabled").Inc(1)
+	if c.enabled {
+		c.scope.Counter(metricsEnabled).Inc(1)
 	} else {
-		c.scope.Counter("concurrency_auto_scaler.disabled").Inc(1)
+		c.scope.Counter(metricsDisabled).Inc(1)
 	}
-	c.scope.Gauge("poller_in_action").Update(float64(c.concurrency.PollerPermit.Count()))
-	c.scope.Gauge("poller_quota").Update(float64(c.concurrency.PollerPermit.Quota()))
-	c.scope.Gauge("poller_wait_time").Update(math.Exp2(c.pollerWaitTimeInMsLog2.Average()))
+	c.scope.Gauge(metricsPollerQuota).Update(float64(c.concurrency.PollerPermit.Quota()))
+	c.scope.Timer(metricsPollerWaitTime).Record(c.pollerWaitTime.Average())
 	c.log.Debug(autoScalerEventLogMsg,
 		zap.Time("time", c.clock.Now()),
 		zap.String("event", string(event)),
-		zap.Bool("enabled", c.enable.Load()),
+		zap.Bool("enabled", c.enabled),
 		zap.Int("poller_quota", c.concurrency.PollerPermit.Quota()),
-		zap.Int("poller_in_action", c.concurrency.PollerPermit.Count()),
 	)
 }
 
 func (c *ConcurrencyAutoScaler) updatePollerPermit() {
-	if !c.enable.Load() { // skip update if auto scaler is disabled
+	if !c.enabled { // skip update if auto scaler is disabled
 		c.logEvent(autoScalerEventPollerSkipUpdateNotEnabled)
 		return
 	}
@@ -202,7 +207,9 @@ func (c *ConcurrencyAutoScaler) updatePollerPermit() {
 		return
 	}
 	currentQuota := c.concurrency.PollerPermit.Quota()
-	newQuota := int(math.Round(float64(currentQuota) * targetPollerWaitTimeInMsLog2 / c.pollerWaitTimeInMsLog2.Average() ))
+	// smoothing the scaling through log2
+	newQuota := int(math.Round(float64(currentQuota) * targetPollerWaitTimeInMsLog2 / math.Log2(
+		1+float64(c.pollerWaitTime.Average()/time.Millisecond)) ))
 	if newQuota < c.pollerMinCount {
 		newQuota = c.pollerMinCount
 	}
@@ -218,22 +225,26 @@ func (c *ConcurrencyAutoScaler) updatePollerPermit() {
 	c.logEvent(autoScalerEventPollerUpdate)
 }
 
-type rollingAverage struct {
+type number interface {
+	int64 | float64 | time.Duration
+}
+
+type rollingAverage[T number] struct {
 	mu     sync.RWMutex
-	window []float64
+	window []T
 	index  int
-	sum    float64
+	sum    T
 	count  int
 }
 
-func newRollingAverage(capacity int) *rollingAverage {
-	return &rollingAverage{
-		window: make([]float64, capacity),
+func newRollingAverage[T number](capacity int) *rollingAverage[T] {
+	return &rollingAverage[T]{
+		window: make([]T, capacity),
 	}
 }
 
 // Add always add positive numbers
-func (r *rollingAverage) Add(value float64) {
+func (r *rollingAverage[T]) Add(value T) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -243,21 +254,21 @@ func (r *rollingAverage) Add(value float64) {
 	}
 
 	// replace the old value with the new value
-	r.index %= len(r.window)
 	r.sum += value - r.window[r.index]
 	r.window[r.index] = value
 	r.index++
+	r.index %= len(r.window)
 
 	if r.count < len(r.window) {
 		r.count++
 	}
 }
 
-func (r *rollingAverage) Average() float64 {
+func (r *rollingAverage[T]) Average() T {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	if r.count == 0 {
 		return 0
 	}
-	return r.sum / float64(r.count)
+	return r.sum / T(r.count)
 }
