@@ -34,7 +34,7 @@ import (
 )
 
 const (
-	defaultAutoScalerUpdateTick = time.Second
+	defaultAutoScalerUpdateTick   = time.Second
 	targetPollerWaitTimeInMsLog2  = 4 // 16 ms
 	numberOfPollsInRollingAverage = 20
 
@@ -50,9 +50,9 @@ const (
 	autoScalerEventLogMsg                     string          = "concurrency auto scaler event"
 	testTimeFormat                            string          = "15:04:05"
 
-	metricsEnabled = "enabled"
-	metricsDisabled = "disabled"
-	metricsPollerQuota = "poller-quota"
+	metricsEnabled        = "enabled"
+	metricsDisabled       = "disabled"
+	metricsPollerQuota    = "poller-quota"
 	metricsPollerWaitTime = "poller-wait-time"
 )
 
@@ -69,14 +69,14 @@ type (
 		updateTick  time.Duration
 
 		// state of autoscaler
-		lock sync.RWMutex
+		lock    sync.RWMutex
 		enabled bool
 
 		// poller
 		pollerInitCount        int
 		pollerMaxCount         int
 		pollerMinCount         int
-		pollerWaitTime  *rollingAverage[time.Duration]
+		pollerWaitTime         *rollingAverage[time.Duration]
 		pollerPermitLastUpdate time.Time
 	}
 
@@ -111,7 +111,7 @@ func NewConcurrencyAutoScaler(input ConcurrencyAutoScalerInput) *ConcurrencyAuto
 		pollerInitCount:        input.Concurrency.PollerPermit.Quota(),
 		pollerMaxCount:         input.PollerMaxCount,
 		pollerMinCount:         input.PollerMinCount,
-		pollerWaitTime: newRollingAverage[time.Duration](numberOfPollsInRollingAverage),
+		pollerWaitTime:         newRollingAverage[time.Duration](numberOfPollsInRollingAverage),
 		pollerPermitLastUpdate: input.Clock.Now(),
 	}
 }
@@ -157,7 +157,7 @@ func (c *ConcurrencyAutoScaler) ProcessPollerHint(hint *shared.AutoConfigHint) {
 	}
 	if hint.PollerWaitTimeInMs != nil {
 		waitTimeInMs := *hint.PollerWaitTimeInMs
-		c.pollerWaitTime.Add(time.Millisecond*time.Duration(waitTimeInMs))
+		c.pollerWaitTime.Add(time.Millisecond * time.Duration(waitTimeInMs))
 	}
 
 	var shouldEnable bool
@@ -209,7 +209,7 @@ func (c *ConcurrencyAutoScaler) updatePollerPermit() {
 	currentQuota := c.concurrency.PollerPermit.Quota()
 	// smoothing the scaling through log2
 	newQuota := int(math.Round(float64(currentQuota) * targetPollerWaitTimeInMsLog2 / math.Log2(
-		1+float64(c.pollerWaitTime.Average()/time.Millisecond)) ))
+		1+float64(c.pollerWaitTime.Average()/time.Millisecond))))
 	if newQuota < c.pollerMinCount {
 		newQuota = c.pollerMinCount
 	}

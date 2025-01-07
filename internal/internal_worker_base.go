@@ -425,12 +425,12 @@ func (bw *baseWorker) Stop() {
 
 func getAutoConfigHint(task interface{}) *shared.AutoConfigHint {
 	switch t := task.(type) {
-	case workflowTask:
+	case *workflowTask:
 		if t.task == nil {
 			return nil
 		}
 		return t.task.AutoConfigHint
-	case activityTask:
+	case *activityTask:
 		if t.task == nil {
 			return nil
 		}
