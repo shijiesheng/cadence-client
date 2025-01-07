@@ -168,6 +168,8 @@ func createPollRetryPolicy() backoff.RetryPolicy {
 
 func newBaseWorker(options baseWorkerOptions, logger *zap.Logger, metricsScope tally.Scope, sessionTokenBucket *sessionTokenBucket) *baseWorker {
 	ctx, cancel := context.WithCancel(context.Background())
+	logger = logger.With(zapcore.Field{Key: tagWorkerType, Type: zapcore.StringType, String: options.workerType})
+	metricsScope = tagScope(metricsScope, tagWorkerType, options.workerType)
 
 	concurrency := &worker.ConcurrencyLimit{
 		PollerPermit: worker.NewResizablePermit(options.pollerCount),
@@ -192,8 +194,8 @@ func newBaseWorker(options baseWorkerOptions, logger *zap.Logger, metricsScope t
 		shutdownCh:            make(chan struct{}),
 		taskLimiter:           rate.NewLimiter(rate.Limit(options.maxTaskPerSecond), 1),
 		retrier:               backoff.NewConcurrentRetrier(pollOperationRetryPolicy),
-		logger:                logger.With(zapcore.Field{Key: tagWorkerType, Type: zapcore.StringType, String: options.workerType}),
-		metricsScope:          tagScope(metricsScope, tagWorkerType, options.workerType),
+		logger:                logger,
+		metricsScope:          metricsScope,
 		concurrency:           concurrency,
 		concurrencyAutoScaler: concurrencyAS,
 		taskQueueCh:           make(chan interface{}), // no buffer, so poller only able to poll new task after previous is dispatched.
