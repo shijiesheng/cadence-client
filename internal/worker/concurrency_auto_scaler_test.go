@@ -290,7 +290,7 @@ func TestRollingAverage(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			defer goleak.VerifyNone(t)
-			r := newRollingAverage(tt.cap)
+			r := newRollingAverage[float64](tt.cap)
 			for i := range tt.input {
 				r.Add(tt.input[i])
 				assert.Equal(t, tt.expected[i], r.Average())
@@ -301,7 +301,7 @@ func TestRollingAverage(t *testing.T) {
 
 func TestRollingAverage_Race(t *testing.T) {
 	total := 100000
-	r := newRollingAverage(total)
+	r := newRollingAverage[float64](total)
 	trueSum := atomic.NewFloat64(0)
 	var wg sync.WaitGroup
 	for i := 0; i < total; i++ {
