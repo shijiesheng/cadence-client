@@ -130,8 +130,8 @@ func (c *ConcurrencyAutoScaler) Start() {
 			case <-c.shutdownChan:
 				return
 			case <-ticker.Chan():
-				c.logEvent(autoScalerEventMetrics)
 				c.lock.Lock()
+				c.logEvent(autoScalerEventMetrics)
 				c.updatePollerPermit()
 				c.lock.Unlock()
 			}
