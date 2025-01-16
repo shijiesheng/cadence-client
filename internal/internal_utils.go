@@ -492,11 +492,3 @@ func getLengthOfStringPointer(s *string) int {
 	}
 	return len(*s)
 }
-
-func isEmptyDecisionTask(r *s.PollForDecisionTaskResponse) bool {
-	return r == nil || len(r.TaskToken) == 0
-}
-
-func isEmptyActivityTask(r *s.PollForActivityTaskResponse) bool {
-	return r == nil || len(r.TaskToken) == 0
-}
