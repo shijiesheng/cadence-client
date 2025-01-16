@@ -332,13 +332,13 @@ func (bw *baseWorker) pollTask() {
 			bw.retrier.Failed()
 		} else {
 			bw.retrier.Succeeded()
+			if bw.concurrencyAutoScaler != nil {
+				bw.concurrencyAutoScaler.ProcessPollerHint(getAutoConfigHint(task))
+			}
 		}
 	}
 
 	if task != nil {
-		if bw.concurrencyAutoScaler != nil {
-			bw.concurrencyAutoScaler.ProcessPollerHint(getAutoConfigHint(task))
-		}
 		select {
 		case bw.taskQueueCh <- &polledTask{task}:
 		case <-bw.shutdownCh:
