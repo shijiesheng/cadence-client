@@ -744,7 +744,7 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 	workflowTask *workflowTask,
 	heartbeatFunc decisionHeartbeatFunc,
 ) (completeRequest interface{}, errRet error) {
-	if workflowTask == nil || workflowTask.task == nil {
+	if workflowTask == nil || isEmptyDecisionTask(workflowTask.task) {
 		return nil, errors.New("nil workflow task provided")
 	}
 	task := workflowTask.task
