@@ -176,7 +176,7 @@ func isTaskEmpty(task interface{}) (bool, error) {
 	case *workflowTask:
 		return t == nil || t.task == nil, nil
 	case *activityTask:
-		return t == nil || t.task == nil, nil
+		return t == nil || t.task == nil || len(t.task.TaskToken) == 0, nil
 	case *localActivityTask:
 		return t == nil || t.workflowTask == nil, nil
 	default:
