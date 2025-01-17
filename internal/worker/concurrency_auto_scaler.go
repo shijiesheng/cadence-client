@@ -34,8 +34,9 @@ import (
 )
 
 const (
-	defaultAutoScalerUpdateTick   = time.Second
-	targetPollerWaitTimeInMsLog2  = 4 // 16 ms
+	defaultAutoScalerUpdateTick  = time.Second
+	lowerPollerWaitTime = 16 * time.Millisecond
+	upperPollerWaitTime = 256 * time.Millisecond
 	numberOfPollsInRollingAverage = 20
 
 	autoScalerEventPollerUpdate               autoScalerEvent = "update-poller-limit"
@@ -206,28 +207,53 @@ func (c *ConcurrencyAutoScaler) updatePollerPermit() {
 		c.logEvent(autoScalerEventPollerSkipUpdateCooldown)
 		return
 	}
-	currentQuota := c.concurrency.PollerPermit.Quota()
-	// smoothing the scaling through log2 with edge case of zero value
-	var newQuota int
-	if waitTime := c.pollerWaitTime.Average(); waitTime == 0 {
-		newQuota = currentQuota * 2
+
+	newQuota := c.concurrency.PollerPermit.Quota()
+	pollerWaitTime := c.pollerWaitTime.Average()
+	if pollerWaitTime < lowerPollerWaitTime { // pollers are busy
+		newQuota = c.scaleUpPollerPermit(pollerWaitTime)
+	} else if pollerWaitTime > upperPollerWaitTime { // pollers are idle
+		newQuota = c.scaleDownPollerPermit(pollerWaitTime)
 	} else {
-		newQuota = int(math.Round(
-			float64(currentQuota) * targetPollerWaitTimeInMsLog2 / math.Log2(1+float64(waitTime/time.Millisecond))))
-	}
-	if newQuota < c.pollerMinCount {
-		newQuota = c.pollerMinCount
-	}
-	if newQuota > c.pollerMaxCount {
-		newQuota = c.pollerMaxCount
-	}
-	if newQuota == currentQuota {
 		c.logEvent(autoScalerEventPollerSkipUpdateNoChange)
 		return
 	}
 	c.concurrency.PollerPermit.SetQuota(newQuota)
 	c.pollerPermitLastUpdate = updateTime
 	c.logEvent(autoScalerEventPollerUpdate)
+}
+
+func (c *ConcurrencyAutoScaler) scaleUpPollerPermit(pollerWaitTime time.Duration) int {
+	currentQuota := c.concurrency.PollerPermit.Quota()
+
+	// inverse scaling with edge case of 0 wait time
+	// use logrithm to smooth the scaling to avoid drastic change
+	newQuota := math.Round(
+		float64(currentQuota) * smoothingFunc(lowerPollerWaitTime) / smoothingFunc(pollerWaitTime))
+	newQuota = math.Max(
+		float64(c.pollerMinCount),
+		math.Min(float64(c.pollerMaxCount), newQuota),
+	)
+	return int(newQuota)
+}
+
+func (c *ConcurrencyAutoScaler) scaleDownPollerPermit(pollerWaitTime time.Duration) int {
+	currentQuota := c.concurrency.PollerPermit.Quota()
+
+	// inverse scaling with edge case of 0 wait time
+	// use logrithm to smooth the scaling to avoid drastic change
+	newQuota := math.Round(
+		float64(currentQuota) * smoothingFunc(upperPollerWaitTime) / smoothingFunc(pollerWaitTime))
+	newQuota = math.Max(
+		float64(c.pollerMinCount),
+		math.Min(float64(c.pollerMaxCount), newQuota),
+	)
+	return int(newQuota)
+}
+
+// smoothingFunc is a log2 function with offset to smooth the scaling and address 0 values
+func smoothingFunc(x time.Duration) float64 {
+	return math.Log2(2+ float64(x/time.Millisecond))
 }
 
 type number interface {
