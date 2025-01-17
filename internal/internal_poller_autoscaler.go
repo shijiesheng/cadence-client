@@ -26,7 +26,7 @@ import (
 
 // defaultPollerScalerCooldownInSeconds
 const (
-	defaultPollerAutoScalerCooldown          = time.Minute
+	defaultPollerAutoScalerCooldown          = 10 * time.Second
 	defaultPollerAutoScalerTargetUtilization = 0.6
 	defaultMinConcurrentActivityPollerSize   = 1
 	defaultMinConcurrentDecisionPollerSize   = 2
