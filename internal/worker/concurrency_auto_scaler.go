@@ -34,9 +34,9 @@ import (
 )
 
 const (
-	defaultAutoScalerUpdateTick  = time.Second
-	lowerPollerWaitTime = 16 * time.Millisecond
-	upperPollerWaitTime = 256 * time.Millisecond
+	defaultAutoScalerUpdateTick   = time.Second
+	lowerPollerWaitTime           = 16 * time.Millisecond
+	upperPollerWaitTime           = 256 * time.Millisecond
 	numberOfPollsInRollingAverage = 20
 
 	autoScalerEventPollerUpdate               autoScalerEvent = "update-poller-limit"
@@ -253,7 +253,7 @@ func (c *ConcurrencyAutoScaler) scaleDownPollerPermit(pollerWaitTime time.Durati
 
 // smoothingFunc is a log2 function with offset to smooth the scaling and address 0 values
 func smoothingFunc(x time.Duration) float64 {
-	return math.Log2(2+ float64(x/time.Millisecond))
+	return math.Log2(2 + float64(x/time.Millisecond))
 }
 
 type number interface {
