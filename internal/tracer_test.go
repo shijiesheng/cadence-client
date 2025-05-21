@@ -82,7 +82,7 @@ func TestTracingContextPropagatorWorkflowContext(t *testing.T) {
 
 	span := tracer.StartSpan("test-operation")
 	assert.NotNil(t, span.Context())
-	ctx := contextWithSpan(Background(), span.Context())
+	ctx := WithSpanContext(Background(), span.Context())
 	header := &shared.Header{
 		Fields: map[string][]byte{},
 	}
@@ -130,7 +130,7 @@ func TestConsistentInjectionExtraction(t *testing.T) {
 	var baggageVal = "e30="
 	span.SetBaggageItem("request-tenancy", baggageVal)
 	assert.NotNil(t, span.Context())
-	ctx := contextWithSpan(Background(), span.Context())
+	ctx := WithSpanContext(Background(), span.Context())
 	header := &shared.Header{
 		Fields: map[string][]byte{},
 	}

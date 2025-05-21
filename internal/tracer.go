@@ -119,5 +119,5 @@ func (t *tracingContextPropagator) ExtractToWorkflow(
 		// did not find a tracing span, just return the current context
 		return ctx, nil
 	}
-	return contextWithSpan(ctx, spanContext), nil
+	return WithSpanContext(ctx, spanContext), nil
 }

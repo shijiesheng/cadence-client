@@ -93,3 +93,26 @@ func NewDisconnectedContext(parent Context) (ctx Context, cancel CancelFunc) {
 func GetSpanContext(ctx Context) opentracing.SpanContext {
 	return internal.GetSpanContext(ctx)
 }
+
+// WithSpanContext returns [Context] with override [opentracing.SpanContext].
+// This is useful to modify baggage items of current workflow and pass it to activities and child workflows.
+//
+// Example Usage:
+//	func myWorkflow(ctx Context) error {
+// 		// start a new workflow span
+// 		wSpan := opentracing.StartSpan("workflow-operation", opentracing.ChildOf(spanContext))
+// 		// pass the new span context to activity
+// 		aCtx := WithSpanContext(ctx, wSpan.Context())
+// 		var activityFooResult string
+// 		err := ExecuteActivity(aCtx, ActivityFoo).Get(aCtx, &activityFooResult)
+// 		if err != nil {
+// 			wSpan.SetTag("workflow-error", err)
+// 		} else {
+// 			wSpan.SetTag("workflow-result", activityFooResult)
+// 		}
+// 		wSpan.Finish()
+// 		return activityFooResult, err
+// 	}
+func WithSpanContext(ctx Context, spanContext opentracing.SpanContext) Context {
+	return internal.WithSpanContext(ctx, spanContext)
+}

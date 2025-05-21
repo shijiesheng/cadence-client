@@ -494,6 +494,6 @@ func GetSpanContext(ctx Context) opentracing.SpanContext {
 	return nil
 }
 
-func contextWithSpan(ctx Context, spanContext opentracing.SpanContext) Context {
+func WithSpanContext(ctx Context, spanContext opentracing.SpanContext) Context {
 	return WithValue(ctx, activeSpanContextKey, spanContext)
 }
