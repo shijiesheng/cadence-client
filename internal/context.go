@@ -486,7 +486,7 @@ func (c *valueCtx) Value(key interface{}) interface{} {
 	return c.Context.Value(key)
 }
 
-func spanFromContext(ctx Context) opentracing.SpanContext {
+func GetSpanContext(ctx Context) opentracing.SpanContext {
 	val := ctx.Value(activeSpanContextKey)
 	if sp, ok := val.(opentracing.SpanContext); ok {
 		return sp

@@ -21,6 +21,7 @@
 package workflow
 
 import (
+	"github.com/opentracing/opentracing-go"
 	"go.uber.org/cadence/internal"
 )
 
@@ -75,4 +76,20 @@ func WithValue(parent Context, key interface{}, val interface{}) Context {
 //	}
 func NewDisconnectedContext(parent Context) (ctx Context, cancel CancelFunc) {
 	return internal.NewDisconnectedContext(parent)
+}
+
+// GetSpanContext returns the [opentracing.SpanContext] from [Context].
+// Returns nil if tracer is not set in [go.uber.org/cadence/worker.Options].
+//
+// Note: If tracer is set, we already activate a span for each workflow.
+// This SpanContext will be passed to the activities and child workflows to start new spans.
+//
+// Example Usage:
+//
+//	span := GetSpanContext(ctx)
+//	if span != nil {
+//		span.SetTag("foo", "bar")
+//	}
+func GetSpanContext(ctx Context) opentracing.SpanContext {
+	return internal.GetSpanContext(ctx)
 }
