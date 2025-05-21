@@ -21,9 +21,8 @@
 package workflow
 
 import (
-	"fmt"
-
 	"github.com/opentracing/opentracing-go"
+
 	"go.uber.org/cadence/internal"
 )
 
@@ -100,42 +99,44 @@ func GetSpanContext(ctx Context) opentracing.SpanContext {
 // This is useful to modify baggage items of current workflow and pass it to activities and child workflows.
 //
 // Example Usage:
-// func goodWorkflow(ctx Context) (string, error) {
-// 	// start a short lived new workflow span within SideEffect to avoid duplicate span creation during replay
-// 	spanContextValue := SideEffect(ctx, func(ctx Context) interface{} {
-// 		wSpan := opentracing.StartSpan("workflow-operation-with-new-span", opentracing.ChildOf(GetSpanContext(ctx)))
-// 		defer wSpan.Finish()
-// 		wSpan.SetTag("some-key", "some-value")
-// 		return wSpan.Context()
-// 	})
-// 	var spanContext opentracing.SpanContext
-// 	err := spanContextValue.Get(&spanContext)
-// 	if err != nil {
-// 		return "",fmt.Errorf("failed to get span context: %w", err)
-// 	}
 //
-// 	aCtx := WithSpanContext(ctx, spanContext)
-// 	var activityFooResult string
-// 	err = ExecuteActivity(aCtx, activityFoo).Get(aCtx, &activityFooResult)
-// 	return activityFooResult, err
-// }
+//	func goodWorkflow(ctx Context) (string, error) {
+//		// start a short lived new workflow span within SideEffect to avoid duplicate span creation during replay
+//		spanContextValue := SideEffect(ctx, func(ctx Context) interface{} {
+//			wSpan := opentracing.StartSpan("workflow-operation-with-new-span", opentracing.ChildOf(GetSpanContext(ctx)))
+//			defer wSpan.Finish()
+//			wSpan.SetTag("some-key", "some-value")
+//			return wSpan.Context()
+//		})
+//		var spanContext opentracing.SpanContext
+//		err := spanContextValue.Get(&spanContext)
+//		if err != nil {
+//			return "",fmt.Errorf("failed to get span context: %w", err)
+//		}
+//
+//		aCtx := WithSpanContext(ctx, spanContext)
+//		var activityFooResult string
+//		err = ExecuteActivity(aCtx, activityFoo).Get(aCtx, &activityFooResult)
+//		return activityFooResult, err
+//	}
 //
 // Bad Example:
-// func badWorkflow(ctx Context) (string, error) {
-// 	// start a new workflow span for EVERY REPLAY
-// 	wSpan := opentracing.StartSpan("workflow-operation", opentracing.ChildOf(GetSpanContext(ctx)))
-// 	wSpan.SetBaggageItem("some-key", "some-value")
-// 	// pass the new span context to activity
-// 	aCtx := WithSpanContext(ctx, wSpan.Context())
-// 	var activityFooResult string
-// 	err := ExecuteActivity(aCtx, activityFoo).Get(aCtx, &activityFooResult)
-// 	wSpan.Finish()
-// 	return activityFooResult, err
-// }
 //
-// func activityFoo(ctx Context) (string, error) {
-// 	return "activity-foo-result", nil
-// }
+//	func badWorkflow(ctx Context) (string, error) {
+//		// start a new workflow span for EVERY REPLAY
+//		wSpan := opentracing.StartSpan("workflow-operation", opentracing.ChildOf(GetSpanContext(ctx)))
+//		wSpan.SetBaggageItem("some-key", "some-value")
+//		// pass the new span context to activity
+//		aCtx := WithSpanContext(ctx, wSpan.Context())
+//		var activityFooResult string
+//		err := ExecuteActivity(aCtx, activityFoo).Get(aCtx, &activityFooResult)
+//		wSpan.Finish()
+//		return activityFooResult, err
+//	}
+//
+//	func activityFoo(ctx Context) (string, error) {
+//		return "activity-foo-result", nil
+//	}
 func WithSpanContext(ctx Context, spanContext opentracing.SpanContext) Context {
 	return internal.WithSpanContext(ctx, spanContext)
 }
