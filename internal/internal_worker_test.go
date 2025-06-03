@@ -1518,13 +1518,25 @@ func TestGetTaskAutoConfigHint(t *testing.T) {
 		{
 			"decision task",
 			&workflowTask{
-				&shared.PollForDecisionTaskResponse{AutoConfigHint: &hint}, nil, nil, nil},
+				task: &shared.PollForDecisionTaskResponse{AutoConfigHint: &hint}},
+			&hint,
+		},
+		{
+			"empty decision task",
+			&workflowTask{
+				autoConfigHint: &hint},
 			&hint,
 		},
 		{
 			"activity task",
 			&activityTask{
-				&shared.PollForActivityTaskResponse{AutoConfigHint: &hint}, time.Now()},
+				task: &shared.PollForActivityTaskResponse{AutoConfigHint: &hint}},
+			&hint,
+		},
+		{
+			"empty activity task",
+			&activityTask{
+				autoConfigHint: &hint},
 			&hint,
 		},
 		{
