@@ -85,6 +85,7 @@ type (
 	// workflowTask wraps a decision task.
 	workflowTask struct {
 		task            *s.PollForDecisionTaskResponse
+		autoConfigHint  *s.AutoConfigHint
 		historyIterator HistoryIterator
 		doneCh          chan struct{}
 		laResultCh      chan *localActivityResult
@@ -92,8 +93,9 @@ type (
 
 	// activityTask wraps a activity task.
 	activityTask struct {
-		task          *s.PollForActivityTaskResponse
-		pollStartTime time.Time
+		task           *s.PollForActivityTaskResponse
+		autoConfigHint *s.AutoConfigHint
+		pollStartTime  time.Time
 	}
 
 	// resetStickinessTask wraps a ResetStickyTaskListRequest.
@@ -167,14 +169,14 @@ func (t *workflowTask) getAutoConfigHint() *s.AutoConfigHint {
 	if t.task != nil {
 		return t.task.AutoConfigHint
 	}
-	return nil
+	return t.autoConfigHint
 }
 
 func (t *activityTask) getAutoConfigHint() *s.AutoConfigHint {
 	if t.task != nil {
 		return t.task.AutoConfigHint
 	}
-	return nil
+	return t.autoConfigHint
 }
 
 func newHistory(task *workflowTask, eventsHandler *workflowExecutionEventHandlerImpl) *history {
