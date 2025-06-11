@@ -3,8 +3,9 @@ package executor
 import (
 	"errors"
 
-	"go.uber.org/cadence/internal"
 	"go.uber.org/multierr"
+
+	"go.uber.org/cadence/internal"
 )
 
 type Executor interface {
@@ -21,7 +22,7 @@ type batchExecutor struct {
 }
 
 type futureWithResult struct {
-	future internal.Future
+	future   internal.Future
 	valuePtr interface{}
 }
 
@@ -70,7 +71,7 @@ func (e *batchExecutor) Execute(ctx internal.Context) error {
 	for i := range e.factories {
 		buffered.Send(ctx, nil)
 		futuresToProcess.Send(ctx, futureWithResult{
-			future: e.factories[i](ctx),
+			future:   e.factories[i](ctx),
 			valuePtr: e.valuePtrs[i],
 		})
 	}
@@ -83,7 +84,7 @@ func (e *batchExecutor) Execute(ctx internal.Context) error {
 	return errs
 }
 
-func NewBatchExecutor(ctx internal.Context,batchSize int) Executor {
+func NewBatchExecutor(ctx internal.Context, batchSize int) Executor {
 	return &batchExecutor{
 		batchSize: batchSize,
 	}
