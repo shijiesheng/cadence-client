@@ -58,6 +58,11 @@ const (
 	metricsPollerWaitTime = "poller-wait-time"
 )
 
+var (
+	metricsPollerQuotaBuckets = tally.MustMakeExponentialValueBuckets(1, 2, 10) // 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024
+	metricsPollerWaitTimeBuckets = tally.MustMakeExponentialDurationBuckets(1*time.Millisecond, 2, 14) // 1ms, 2ms, 4ms, 8ms, 16ms, 32ms, 64ms, 128ms, 256ms, 512ms, 1024ms, 2048ms, 4096ms, 8192ms, 16384ms
+)
+
 type (
 	ConcurrencyAutoScaler struct {
 		shutdownChan chan struct{}
@@ -202,8 +207,8 @@ func (c *ConcurrencyAutoScaler) logEvent(event autoScalerEvent) {
 	} else {
 		c.scope.Counter(metricsDisabled).Inc(1)
 	}
-	c.scope.Gauge(metricsPollerQuota).Update(float64(c.concurrency.PollerPermit.Quota()))
-	c.scope.Timer(metricsPollerWaitTime).Record(c.pollerWaitTime.Average())
+	c.scope.Histogram(metricsPollerQuota, metricsPollerQuotaBuckets).RecordValue(float64(c.concurrency.PollerPermit.Quota()))
+	c.scope.Histogram(metricsPollerWaitTime, metricsPollerWaitTimeBuckets).RecordDuration(c.pollerWaitTime.Average())
 	c.log.Debug(autoScalerEventLogMsg,
 		zap.Time("time", c.clock.Now()),
 		zap.String("event", string(event)),
