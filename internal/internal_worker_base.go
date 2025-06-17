@@ -181,8 +181,8 @@ func newBaseWorker(options baseWorkerOptions, logger *zap.Logger, metricsScope t
 		concurrencyAS = worker.NewConcurrencyAutoScaler(worker.ConcurrencyAutoScalerInput{
 			Concurrency:              concurrency,
 			Cooldown:                 pollerOptions.Cooldown,
-			PollerMaxCount:           pollerOptions.MaxCount,
-			PollerMinCount:           pollerOptions.MinCount,
+			PollerMaxCount:           pollerOptions.PollerMaxCount,
+			PollerMinCount:           pollerOptions.PollerMinCount,
 			PollerWaitTimeUpperBound: pollerOptions.PollerWaitTimeUpperBound,
 			PollerWaitTimeLowerBound: pollerOptions.PollerWaitTimeLowerBound,
 			Logger:                   logger,

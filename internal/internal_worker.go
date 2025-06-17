@@ -1290,11 +1290,11 @@ func AugmentWorkerOptions(options WorkerOptions) WorkerOptions {
 }
 
 func augmentAutoScalerOptions(options AutoScalerOptions) AutoScalerOptions {
-	if options.MinCount <= 1 {
-		options.MinCount = defaultMinPollerSize
+	if options.PollerMinCount <= 1 {
+		options.PollerMinCount = defaultMinPollerSize
 	}
-	if options.MaxCount <= 1 {
-		options.MaxCount = defaultMaxPollerSize
+	if options.PollerMaxCount <= 1 {
+		options.PollerMaxCount = defaultMaxPollerSize
 	}
 	if options.Cooldown == 0 {
 		options.Cooldown = defaultPollerAutoScalerCooldown

@@ -1324,8 +1324,8 @@ func Test_augmentWorkerOptions(t *testing.T) {
 				Authorization:                           nil,
 				AutoScalerOptions: AutoScalerOptions{
 					Enabled:                  true,
-					MinCount:                 10,
-					MaxCount:                 20,
+					PollerMinCount:           10,
+					PollerMaxCount:           20,
 					Cooldown:                 time.Minute * 3,
 					PollerWaitTimeUpperBound: time.Millisecond * 200,
 					PollerWaitTimeLowerBound: time.Millisecond * 100,
@@ -1364,8 +1364,8 @@ func Test_augmentWorkerOptions(t *testing.T) {
 				Authorization:                           nil,
 				AutoScalerOptions: AutoScalerOptions{
 					Enabled:                  true,
-					MinCount:                 10,
-					MaxCount:                 20,
+					PollerMinCount:           10,
+					PollerMaxCount:           20,
 					Cooldown:                 time.Minute * 3,
 					PollerWaitTimeUpperBound: time.Millisecond * 200,
 					PollerWaitTimeLowerBound: time.Millisecond * 100,
@@ -1408,8 +1408,8 @@ func Test_augmentWorkerOptions(t *testing.T) {
 				Authorization:                           nil,
 				AutoScalerOptions: AutoScalerOptions{
 					Enabled:                  false,
-					MinCount:                 2,
-					MaxCount:                 200,
+					PollerMinCount:           2,
+					PollerMaxCount:           200,
 					Cooldown:                 time.Second * 10,
 					PollerWaitTimeUpperBound: time.Millisecond * 256,
 					PollerWaitTimeLowerBound: time.Millisecond * 16,
