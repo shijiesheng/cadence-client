@@ -277,15 +277,7 @@ func newWorkflowTaskWorkerInternal(
 		params,
 	)
 	worker := newBaseWorker(baseWorkerOptions{
-		pollerAutoScaler: pollerAutoScalerOptions{
-			Enabled:           params.FeatureFlags.PollerAutoScalerEnabled,
-			InitCount:         params.MaxConcurrentDecisionTaskPollers,
-			MinCount:          params.MinConcurrentDecisionTaskPollers,
-			MaxCount:          params.MaxConcurrentDecisionTaskPollers,
-			Cooldown:          params.PollerAutoScalerCooldown,
-			DryRun:            params.PollerAutoScalerDryRun,
-			TargetUtilization: params.PollerAutoScalerTargetUtilization,
-		},
+		pollerAutoScaler:  params.AutoScalerOptions,
 		pollerCount:       params.MaxConcurrentDecisionTaskPollers,
 		pollerRate:        defaultPollerRate,
 		maxConcurrentTask: params.MaxConcurrentDecisionTaskExecutionSize,
@@ -478,15 +470,7 @@ func newActivityTaskWorker(
 	ensureRequiredParams(&workerParams)
 	base := newBaseWorker(
 		baseWorkerOptions{
-			pollerAutoScaler: pollerAutoScalerOptions{
-				Enabled:           workerParams.FeatureFlags.PollerAutoScalerEnabled,
-				InitCount:         workerParams.MaxConcurrentActivityTaskPollers,
-				MinCount:          workerParams.MinConcurrentActivityTaskPollers,
-				MaxCount:          workerParams.MaxConcurrentActivityTaskPollers,
-				Cooldown:          workerParams.PollerAutoScalerCooldown,
-				DryRun:            workerParams.PollerAutoScalerDryRun,
-				TargetUtilization: workerParams.PollerAutoScalerTargetUtilization,
-			},
+			pollerAutoScaler:  workerParams.AutoScalerOptions,
 			pollerCount:       workerParams.MaxConcurrentActivityTaskPollers,
 			pollerRate:        defaultPollerRate,
 			maxConcurrentTask: workerParams.MaxConcurrentActivityExecutionSize,
@@ -1287,18 +1271,7 @@ func AugmentWorkerOptions(options WorkerOptions) WorkerOptions {
 	if options.MaxConcurrentSessionExecutionSize == 0 {
 		options.MaxConcurrentSessionExecutionSize = defaultMaxConcurrentSessionExecutionSize
 	}
-	if options.MinConcurrentActivityTaskPollers == 0 {
-		options.MinConcurrentActivityTaskPollers = defaultMinConcurrentActivityPollerSize
-	}
-	if options.MinConcurrentDecisionTaskPollers == 0 {
-		options.MinConcurrentDecisionTaskPollers = defaultMinConcurrentDecisionPollerSize
-	}
-	if options.PollerAutoScalerCooldown == 0 {
-		options.PollerAutoScalerCooldown = defaultPollerAutoScalerCooldown
-	}
-	if options.PollerAutoScalerTargetUtilization == 0 {
-		options.PollerAutoScalerTargetUtilization = defaultPollerAutoScalerTargetUtilization
-	}
+	options.AutoScalerOptions = augmentAutoScalerOptions(options.AutoScalerOptions)
 
 	// if the user passes in a tracer then add a tracing context propagator
 	if options.Tracer != nil {
@@ -1313,6 +1286,25 @@ func AugmentWorkerOptions(options WorkerOptions) WorkerOptions {
 		options.EnableSessionWorker = false
 	}
 
+	return options
+}
+
+func augmentAutoScalerOptions(options AutoScalerOptions) AutoScalerOptions {
+	if options.MinCount <= 1 {
+		options.MinCount = defaultMinPollerSize
+	}
+	if options.MaxCount <= 1 {
+		options.MaxCount = defaultMaxPollerSize
+	}
+	if options.Cooldown == 0 {
+		options.Cooldown = defaultPollerAutoScalerCooldown
+	}
+	if options.PollerWaitTimeUpperBound == 0 {
+		options.PollerWaitTimeUpperBound = defaultPollerAutoScalerWaitTimeUpperBound
+	}
+	if options.PollerWaitTimeLowerBound == 0 {
+		options.PollerWaitTimeLowerBound = defaultPollerAutoScalerWaitTimeLowerBound
+	}
 	return options
 }
 

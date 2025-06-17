@@ -26,20 +26,20 @@ import (
 
 // defaultPollerScalerCooldownInSeconds
 const (
-	defaultPollerAutoScalerCooldown          = 10 * time.Second
-	defaultPollerAutoScalerTargetUtilization = 0.6
-	defaultMinConcurrentActivityPollerSize   = 1
-	defaultMinConcurrentDecisionPollerSize   = 2
+	defaultPollerAutoScalerCooldown           = 10 * time.Second
+	defaultMinPollerSize                      = 2
+	defaultMaxPollerSize                      = 200
+	defaultPollerAutoScalerWaitTimeUpperBound = 256 * time.Millisecond
+	defaultPollerAutoScalerWaitTimeLowerBound = 16 * time.Millisecond
 )
 
 type (
-	pollerAutoScalerOptions struct {
-		Enabled           bool
-		InitCount         int
-		MinCount          int
-		MaxCount          int
-		Cooldown          time.Duration
-		DryRun            bool
-		TargetUtilization float64
+	AutoScalerOptions struct {
+		Enabled                  bool
+		MinCount                 int
+		MaxCount                 int
+		Cooldown                 time.Duration
+		PollerWaitTimeUpperBound time.Duration
+		PollerWaitTimeLowerBound time.Duration
 	}
 )
