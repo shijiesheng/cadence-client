@@ -35,9 +35,7 @@ import (
 
 const (
 	defaultAutoScalerUpdateTick   = time.Second
-	lowerPollerWaitTime           = 16 * time.Millisecond
-	upperPollerWaitTime           = 256 * time.Millisecond
-	numberOfPollsInRollingAverage = 20
+	numberOfPollsInRollingAverage = 5 // control flakiness of the auto scaler signal
 
 	autoScalerEventPollerScaleUp              autoScalerEvent = "poller-limit-scale-up"
 	autoScalerEventPollerScaleDown            autoScalerEvent = "poller-limit-scale-down"
@@ -59,7 +57,7 @@ const (
 )
 
 var (
-	metricsPollerQuotaBuckets = tally.MustMakeExponentialValueBuckets(1, 2, 10) // 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024
+	metricsPollerQuotaBuckets    = tally.MustMakeExponentialValueBuckets(1, 2, 10)                     // 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024
 	metricsPollerWaitTimeBuckets = tally.MustMakeExponentialDurationBuckets(1*time.Millisecond, 2, 14) // 1ms, 2ms, 4ms, 8ms, 16ms, 32ms, 64ms, 128ms, 256ms, 512ms, 1024ms, 2048ms, 4096ms, 8192ms, 16384ms
 )
 
@@ -80,22 +78,26 @@ type (
 		enabled bool
 
 		// poller
-		pollerInitCount        int
-		pollerMaxCount         int
-		pollerMinCount         int
-		pollerWaitTime         *rollingAverage[time.Duration]
-		pollerPermitLastUpdate time.Time
+		pollerInitCount          int
+		pollerMaxCount           int
+		pollerMinCount           int
+		pollerWaitTime           *rollingAverage[time.Duration]
+		pollerPermitLastUpdate   time.Time
+		pollerWaitTimeUpperBound time.Duration
+		pollerWaitTimeLowerBound time.Duration
 	}
 
 	ConcurrencyAutoScalerInput struct {
-		Concurrency    *ConcurrencyLimit
-		Cooldown       time.Duration // cooldown time of update
-		Tick           time.Duration // frequency of update check
-		PollerMaxCount int
-		PollerMinCount int
-		Logger         *zap.Logger
-		Scope          tally.Scope
-		Clock          clockwork.Clock
+		Concurrency              *ConcurrencyLimit
+		Cooldown                 time.Duration // cooldown time of update
+		Tick                     time.Duration // frequency of update check
+		PollerMaxCount           int
+		PollerMinCount           int
+		PollerWaitTimeUpperBound time.Duration
+		PollerWaitTimeLowerBound time.Duration
+		Logger                   *zap.Logger
+		Scope                    tally.Scope
+		Clock                    clockwork.Clock
 	}
 
 	autoScalerEvent string
@@ -107,19 +109,21 @@ func NewConcurrencyAutoScaler(input ConcurrencyAutoScalerInput) *ConcurrencyAuto
 		tick = input.Tick
 	}
 	return &ConcurrencyAutoScaler{
-		shutdownChan:           make(chan struct{}),
-		concurrency:            input.Concurrency,
-		cooldown:               input.Cooldown,
-		log:                    input.Logger.Named(metrics.ConcurrencyAutoScalerScope),
-		scope:                  input.Scope.SubScope(metrics.ConcurrencyAutoScalerScope),
-		clock:                  input.Clock,
-		updateTick:             tick,
-		enabled:                false, // initial value should be false and is only turned on from auto config hint
-		pollerInitCount:        input.Concurrency.PollerPermit.Quota(),
-		pollerMaxCount:         input.PollerMaxCount,
-		pollerMinCount:         input.PollerMinCount,
-		pollerWaitTime:         newRollingAverage[time.Duration](numberOfPollsInRollingAverage),
-		pollerPermitLastUpdate: input.Clock.Now(),
+		shutdownChan:             make(chan struct{}),
+		concurrency:              input.Concurrency,
+		cooldown:                 input.Cooldown,
+		log:                      input.Logger.Named(metrics.ConcurrencyAutoScalerScope),
+		scope:                    input.Scope.SubScope(metrics.ConcurrencyAutoScalerScope),
+		clock:                    input.Clock,
+		updateTick:               tick,
+		enabled:                  false, // initial value should be false and is only turned on from auto config hint
+		pollerInitCount:          input.Concurrency.PollerPermit.Quota(),
+		pollerMaxCount:           input.PollerMaxCount,
+		pollerMinCount:           input.PollerMinCount,
+		pollerWaitTime:           newRollingAverage[time.Duration](numberOfPollsInRollingAverage),
+		pollerWaitTimeUpperBound: input.PollerWaitTimeUpperBound,
+		pollerWaitTimeLowerBound: input.PollerWaitTimeLowerBound,
+		pollerPermitLastUpdate:   input.Clock.Now(),
 	}
 }
 
@@ -230,12 +234,12 @@ func (c *ConcurrencyAutoScaler) updatePollerPermit() {
 
 	var newQuota int
 	pollerWaitTime := c.pollerWaitTime.Average()
-	if pollerWaitTime < lowerPollerWaitTime { // pollers are busy
+	if pollerWaitTime < c.pollerWaitTimeLowerBound { // pollers are busy
 		newQuota = c.scaleUpPollerPermit(pollerWaitTime)
 		c.concurrency.PollerPermit.SetQuota(newQuota)
 		c.pollerPermitLastUpdate = updateTime
 		c.logEvent(autoScalerEventPollerScaleUp)
-	} else if pollerWaitTime > upperPollerWaitTime { // pollers are idle
+	} else if pollerWaitTime > c.pollerWaitTimeUpperBound { // pollers are idle
 		newQuota = c.scaleDownPollerPermit(pollerWaitTime)
 		c.concurrency.PollerPermit.SetQuota(newQuota)
 		c.pollerPermitLastUpdate = updateTime
@@ -252,7 +256,7 @@ func (c *ConcurrencyAutoScaler) scaleUpPollerPermit(pollerWaitTime time.Duration
 	// inverse scaling with edge case of 0 wait time
 	// use logrithm to smooth the scaling to avoid drastic change
 	newQuota := math.Round(
-		float64(currentQuota) * smoothingFunc(lowerPollerWaitTime) / smoothingFunc(pollerWaitTime))
+		float64(currentQuota) * smoothingFunc(c.pollerWaitTimeLowerBound) / smoothingFunc(pollerWaitTime))
 	newQuota = math.Max(
 		float64(c.pollerMinCount),
 		math.Min(float64(c.pollerMaxCount), newQuota),
@@ -266,7 +270,7 @@ func (c *ConcurrencyAutoScaler) scaleDownPollerPermit(pollerWaitTime time.Durati
 	// inverse scaling with edge case of 0 wait time
 	// use logrithm to smooth the scaling to avoid drastic change
 	newQuota := math.Round(
-		float64(currentQuota) * smoothingFunc(upperPollerWaitTime) / smoothingFunc(pollerWaitTime))
+		float64(currentQuota) * smoothingFunc(c.pollerWaitTimeUpperBound) / smoothingFunc(pollerWaitTime))
 	newQuota = math.Max(
 		float64(c.pollerMinCount),
 		math.Min(float64(c.pollerMaxCount), newQuota),

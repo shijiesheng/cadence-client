@@ -48,13 +48,15 @@ func createTestConcurrencyAutoScaler(t *testing.T, logger *zap.Logger, clock clo
 			PollerPermit: NewResizablePermit(100),
 			TaskPermit:   NewResizablePermit(1000),
 		},
-		Cooldown:       2 * testTickTime,
-		Tick:           testTickTime,
-		PollerMaxCount: 200,
-		PollerMinCount: 50,
-		Logger:         logger,
-		Scope:          tally.NoopScope,
-		Clock:          clock,
+		Cooldown:                 2 * testTickTime,
+		Tick:                     testTickTime,
+		PollerMaxCount:           200,
+		PollerMinCount:           50,
+		Logger:                   logger,
+		Scope:                    tally.NoopScope,
+		Clock:                    clock,
+		PollerWaitTimeLowerBound: 16 * time.Millisecond,
+		PollerWaitTimeUpperBound: 256 * time.Millisecond,
 	})
 }
 

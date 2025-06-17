@@ -115,7 +115,7 @@ type (
 
 	// baseWorkerOptions options to configure base worker.
 	baseWorkerOptions struct {
-		pollerAutoScaler  pollerAutoScalerOptions
+		pollerAutoScaler  AutoScalerOptions
 		pollerCount       int
 		pollerRate        int
 		maxConcurrentTask int
@@ -179,13 +179,15 @@ func newBaseWorker(options baseWorkerOptions, logger *zap.Logger, metricsScope t
 	var concurrencyAS *worker.ConcurrencyAutoScaler
 	if pollerOptions := options.pollerAutoScaler; pollerOptions.Enabled {
 		concurrencyAS = worker.NewConcurrencyAutoScaler(worker.ConcurrencyAutoScalerInput{
-			Concurrency:    concurrency,
-			Cooldown:       pollerOptions.Cooldown,
-			PollerMaxCount: pollerOptions.MaxCount,
-			PollerMinCount: pollerOptions.MinCount,
-			Logger:         logger,
-			Scope:          metricsScope,
-			Clock:          clockwork.NewRealClock(),
+			Concurrency:              concurrency,
+			Cooldown:                 pollerOptions.Cooldown,
+			PollerMaxCount:           pollerOptions.MaxCount,
+			PollerMinCount:           pollerOptions.MinCount,
+			PollerWaitTimeUpperBound: pollerOptions.PollerWaitTimeUpperBound,
+			PollerWaitTimeLowerBound: pollerOptions.PollerWaitTimeLowerBound,
+			Logger:                   logger,
+			Scope:                    metricsScope,
+			Clock:                    clockwork.NewRealClock(),
 		})
 	}
 
