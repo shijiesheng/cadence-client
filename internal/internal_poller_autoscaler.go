@@ -35,11 +35,30 @@ const (
 
 type (
 	AutoScalerOptions struct {
-		Enabled                  bool
-		MinCount                 int
-		MaxCount                 int
-		Cooldown                 time.Duration
+		// Optional: Enable the auto scaler.
+		// default: false
+		Enabled bool
+
+		// Optional: The cooldown period after a scale up or down.
+		// default: 10 seconds
+		Cooldown time.Duration
+
+		// Optional: The minimum number of pollers to start with.
+		// default: 2
+		PollerMinCount int
+
+		// Optional: The maximum number of pollers to start with.
+		// default: 200
+		PollerMaxCount int
+
+		// Optional: The upper bound of poller wait time for poller autoscaler to scale down.
+		// default: 256ms
+		// NOTE: This is normally not needed to be set by user.
 		PollerWaitTimeUpperBound time.Duration
+
+		// Optional: The lower bound of poller wait time for poller autoscaler to scale up.
+		// default: 16ms
+		// NOTE: This is normally not needed to be set by user.
 		PollerWaitTimeLowerBound time.Duration
 	}
 )
