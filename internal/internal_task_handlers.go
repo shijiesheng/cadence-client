@@ -166,17 +166,23 @@ type (
 )
 
 func (t *workflowTask) getAutoConfigHint() *s.AutoConfigHint {
+	if t.autoConfigHint != nil {
+		return t.autoConfigHint
+	}
 	if t.task != nil {
 		return t.task.AutoConfigHint
 	}
-	return t.autoConfigHint
+	return nil
 }
 
 func (t *activityTask) getAutoConfigHint() *s.AutoConfigHint {
+	if t.autoConfigHint != nil {
+		return t.autoConfigHint
+	}
 	if t.task != nil {
 		return t.task.AutoConfigHint
 	}
-	return t.autoConfigHint
+	return nil
 }
 
 func newHistory(task *workflowTask, eventsHandler *workflowExecutionEventHandlerImpl) *history {

@@ -217,9 +217,7 @@ func (bw *baseWorker) Start() {
 
 	bw.metricsScope.Counter(metrics.WorkerStartCounter).Inc(1)
 
-	if bw.concurrencyAutoScaler != nil {
-		bw.concurrencyAutoScaler.Start()
-	}
+	bw.concurrencyAutoScaler.Start()
 
 	for i := 0; i < bw.options.pollerCount; i++ {
 		bw.shutdownWG.Add(1)
@@ -308,12 +306,10 @@ func (bw *baseWorker) pollTask() {
 	var err error
 	var task interface{}
 
-	if bw.concurrencyAutoScaler != nil {
-		if pErr := bw.concurrency.PollerPermit.Acquire(bw.limiterContext); pErr == nil {
-			defer bw.concurrency.PollerPermit.Release()
-		} else {
-			bw.logger.Warn("poller permit acquire error", zap.Error(pErr))
-		}
+	if pErr := bw.concurrency.PollerPermit.Acquire(bw.limiterContext); pErr == nil {
+		defer bw.concurrency.PollerPermit.Release()
+	} else {
+		bw.logger.Warn("poller permit acquire error", zap.Error(pErr))
 	}
 
 	bw.retrier.Throttle()
@@ -332,7 +328,7 @@ func (bw *baseWorker) pollTask() {
 			bw.retrier.Failed()
 		} else {
 			bw.retrier.Succeeded()
-			if t, ok := task.(autoConfigHintAwareTask); bw.concurrencyAutoScaler != nil && ok {
+			if t, ok := task.(autoConfigHintAwareTask); ok {
 				bw.concurrencyAutoScaler.ProcessPollerHint(t.getAutoConfigHint())
 			}
 		}
@@ -408,9 +404,7 @@ func (bw *baseWorker) Stop() {
 	}
 	close(bw.shutdownCh)
 	bw.limiterContextCancel()
-	if bw.concurrencyAutoScaler != nil {
-		bw.concurrencyAutoScaler.Stop()
-	}
+	bw.concurrencyAutoScaler.Stop()
 
 	if success := util.AwaitWaitGroup(&bw.shutdownWG, bw.options.shutdownTimeout); !success {
 		traceLog(func() {
@@ -423,21 +417,4 @@ func (bw *baseWorker) Stop() {
 		bw.options.userContextCancel()
 	}
 	return
-}
-
-func getAutoConfigHint(task interface{}) *shared.AutoConfigHint {
-	switch t := task.(type) {
-	case *workflowTask:
-		if t.task != nil {
-			return t.task.AutoConfigHint
-		}
-		return t.autoConfigHint
-	case *activityTask:
-		if t.task != nil {
-			return t.task.AutoConfigHint
-		}
-		return t.autoConfigHint
-	default:
-		return nil
-	}
 }

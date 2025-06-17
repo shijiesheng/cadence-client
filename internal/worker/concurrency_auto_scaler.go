@@ -39,15 +39,16 @@ const (
 	upperPollerWaitTime           = 256 * time.Millisecond
 	numberOfPollsInRollingAverage = 20
 
-	autoScalerEventPollerUpdate               autoScalerEvent = "update-poller-limit"
-	autoScalerEventPollerSkipUpdateCooldown                   = "skip-update-poller-limit-cooldown"
-	autoScalerEventPollerSkipUpdateNoChange                   = "skip-update-poller-limit-no-change"
-	autoScalerEventPollerSkipUpdateNotEnabled                 = "skip-update-poller-limit-not-enabled"
-	autoScalerEventMetrics                                    = "metrics"
-	autoScalerEventEnable                                     = "enable"
-	autoScalerEventDisable                                    = "disable"
-	autoScalerEventStart                                      = "start"
-	autoScalerEventStop                                       = "stop"
+	autoScalerEventPollerScaleUp              autoScalerEvent = "poller-limit-scale-up"
+	autoScalerEventPollerScaleDown            autoScalerEvent = "poller-limit-scale-down"
+	autoScalerEventPollerSkipUpdateCooldown   autoScalerEvent = "poller-limit-skip-update-cooldown"
+	autoScalerEventPollerSkipUpdateNoChange   autoScalerEvent = "poller-limit-skip-update-no-change"
+	autoScalerEventPollerSkipUpdateNotEnabled autoScalerEvent = "poller-limit-skip-update-not-enabled"
+	autoScalerEventEmitMetrics                autoScalerEvent = "auto-scaler-emit-metrics"
+	autoScalerEventEnable                     autoScalerEvent = "auto-scaler-enable"
+	autoScalerEventDisable                    autoScalerEvent = "auto-scaler-disable"
+	autoScalerEventStart                      autoScalerEvent = "auto-scaler-start"
+	autoScalerEventStop                       autoScalerEvent = "auto-scaler-stop"
 	autoScalerEventLogMsg                     string          = "concurrency auto scaler event"
 	testTimeFormat                            string          = "15:04:05"
 
@@ -118,11 +119,19 @@ func NewConcurrencyAutoScaler(input ConcurrencyAutoScalerInput) *ConcurrencyAuto
 }
 
 func (c *ConcurrencyAutoScaler) Start() {
+	if c == nil {
+		return // no-op if auto scaler is not set
+	}
 	c.logEvent(autoScalerEventStart)
 
 	c.wg.Add(1)
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				c.log.Error("panic in concurrency auto scaler, stopping the auto scaler", zap.Any("error", r))
+			}
+		}()
 		defer c.wg.Done()
 		ticker := c.clock.NewTicker(c.updateTick)
 		defer ticker.Stop()
@@ -132,7 +141,7 @@ func (c *ConcurrencyAutoScaler) Start() {
 				return
 			case <-ticker.Chan():
 				c.lock.Lock()
-				c.logEvent(autoScalerEventMetrics)
+				c.logEvent(autoScalerEventEmitMetrics)
 				c.updatePollerPermit()
 				c.lock.Unlock()
 			}
@@ -141,6 +150,9 @@ func (c *ConcurrencyAutoScaler) Start() {
 }
 
 func (c *ConcurrencyAutoScaler) Stop() {
+	if c == nil {
+		return // no-op if auto scaler is not set
+	}
 	close(c.shutdownChan)
 	c.wg.Wait()
 	c.logEvent(autoScalerEventStop)
@@ -150,6 +162,9 @@ func (c *ConcurrencyAutoScaler) Stop() {
 // 1. update poller wait time
 // 2. enable/disable auto scaler
 func (c *ConcurrencyAutoScaler) ProcessPollerHint(hint *shared.AutoConfigHint) {
+	if c == nil {
+		return // no-op if auto scaler is not set
+	}
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -208,19 +223,22 @@ func (c *ConcurrencyAutoScaler) updatePollerPermit() {
 		return
 	}
 
-	newQuota := c.concurrency.PollerPermit.Quota()
+	var newQuota int
 	pollerWaitTime := c.pollerWaitTime.Average()
 	if pollerWaitTime < lowerPollerWaitTime { // pollers are busy
 		newQuota = c.scaleUpPollerPermit(pollerWaitTime)
+		c.concurrency.PollerPermit.SetQuota(newQuota)
+		c.pollerPermitLastUpdate = updateTime
+		c.logEvent(autoScalerEventPollerScaleUp)
 	} else if pollerWaitTime > upperPollerWaitTime { // pollers are idle
 		newQuota = c.scaleDownPollerPermit(pollerWaitTime)
+		c.concurrency.PollerPermit.SetQuota(newQuota)
+		c.pollerPermitLastUpdate = updateTime
+		c.logEvent(autoScalerEventPollerScaleDown)
 	} else {
 		c.logEvent(autoScalerEventPollerSkipUpdateNoChange)
 		return
 	}
-	c.concurrency.PollerPermit.SetQuota(newQuota)
-	c.pollerPermitLastUpdate = updateTime
-	c.logEvent(autoScalerEventPollerUpdate)
 }
 
 func (c *ConcurrencyAutoScaler) scaleUpPollerPermit(pollerWaitTime time.Duration) int {
