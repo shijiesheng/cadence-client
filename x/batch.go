@@ -5,13 +5,13 @@ import (
 	"go.uber.org/cadence/workflow"
 )
 
-// Executor is a interface that allows to add futures to an executor and execute them in batch
+// BatchFuture is a interface that extends workflow.Future and adds a method to get the futures created
 type BatchFuture interface {
 	workflow.Future
 	GetFutures() []workflow.Future
 }
 
-// NewBatchExecutor creates a new batch executor
+// NewBatchFuture creates a new batch future
 func NewBatchFuture(ctx workflow.Context, batchSize int, factories []func(ctx workflow.Context) workflow.Future) (BatchFuture, error) {
 	return batch.NewBatchFuture(ctx, batchSize, factories)
 }
