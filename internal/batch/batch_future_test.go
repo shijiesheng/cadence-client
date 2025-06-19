@@ -11,9 +11,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"go.uber.org/multierr"
+
 	"go.uber.org/cadence/internal"
 	"go.uber.org/cadence/testsuite"
-	"go.uber.org/multierr"
 )
 
 type batchWorkflowInput struct {
@@ -128,7 +129,7 @@ func Test_BatchWorkflow_Cancel(t *testing.T) {
 		})
 	}()
 
-	time.Sleep(time.Second*2)
+	time.Sleep(time.Second * 2)
 	env.CancelWorkflow()
 
 	assert.Eventually(t, func() bool {
