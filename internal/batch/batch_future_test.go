@@ -90,19 +90,17 @@ func Test_BatchWorkflow(t *testing.T) {
 	env.RegisterWorkflow(batchWorkflow)
 	env.RegisterActivity(batchActivity)
 
-	totalSize := 5
-	concurrency := 2
-	go func() {
-		env.ExecuteWorkflow(batchWorkflow, batchWorkflowInput{
-			Concurrency: concurrency,
-			TotalSize:   totalSize,
-		})
-	}()
+	totalSize := 100
+	concurrency := 10
 
-	// wait for maximum time it takes to complete the workflow (totalSize/concurrency) + 1 second
-	assert.Eventually(t, func() bool {
-		return env.IsWorkflowCompleted()
-	}, time.Second*time.Duration(1+float64(totalSize)/float64(concurrency)), time.Millisecond*100)
+	startTime := time.Now()
+	env.ExecuteWorkflow(batchWorkflow, batchWorkflowInput{
+		Concurrency: concurrency,
+		TotalSize:   totalSize,
+	})
+
+	assert.Less(t, time.Since(startTime), time.Second*time.Duration(float64(totalSize)/float64(concurrency)))
+	assert.True(t, env.IsWorkflowCompleted())
 
 	assert.Nil(t, env.GetWorkflowError())
 	var result []int
@@ -129,12 +127,13 @@ func Test_BatchWorkflow_Cancel(t *testing.T) {
 		})
 	}()
 
-	time.Sleep(time.Second * 2)
+	totalExpectedTime := time.Second * time.Duration(totalSize/concurrency)
+
+	time.Sleep(totalExpectedTime / 2)
 	env.CancelWorkflow()
 
-	assert.Eventually(t, func() bool {
-		return env.IsWorkflowCompleted()
-	}, time.Second*time.Duration(1+float64(totalSize)/float64(concurrency)), time.Millisecond*100)
+	time.Sleep(totalExpectedTime / 2)
+	assert.True(t, env.IsWorkflowCompleted())
 
 	err := env.GetWorkflowError()
 	errs := multierr.Errors(errors.Unwrap(err))
@@ -153,17 +152,14 @@ func Test_BatchWorkflowUsingFutures(t *testing.T) {
 
 	totalSize := 100
 	concurrency := 20
-	go func() {
-		env.ExecuteWorkflow(batchWorkflowUsingFutures, batchWorkflowInput{
-			Concurrency: concurrency,
-			TotalSize:   totalSize,
-		})
-	}()
 
-	// wait for maximum time it takes to complete the workflow (totalSize/concurrency) + 1 second
-	assert.Eventually(t, func() bool {
-		return env.IsWorkflowCompleted()
-	}, time.Second*time.Duration(1+float64(totalSize)/float64(concurrency)), time.Millisecond*100)
+	startTime := time.Now()
+	env.ExecuteWorkflow(batchWorkflowUsingFutures, batchWorkflowInput{
+		Concurrency: concurrency,
+		TotalSize:   totalSize,
+	})
+	assert.Less(t, time.Since(startTime), time.Second*time.Duration(float64(totalSize)/float64(concurrency)))
+	assert.True(t, env.IsWorkflowCompleted())
 
 	assert.Nil(t, env.GetWorkflowError())
 	var result []int
