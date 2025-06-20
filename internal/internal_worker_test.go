@@ -1555,10 +1555,12 @@ func TestGetTaskAutoConfigHint(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			if task, ok := tt.task.(autoConfigHintAwareTask); ok {
-				assert.Equal(t, tt.want, task.getAutoConfigHint())
+			task, ok := tt.task.(autoConfigHintAwareTask)
+			if tt.want == nil {
+				assert.False(t, ok)
 			} else {
-				assert.Nil(t, tt.want)
+				assert.True(t, ok)
+				assert.Equal(t, tt.want, task.getAutoConfigHint())
 			}
 		})
 	}

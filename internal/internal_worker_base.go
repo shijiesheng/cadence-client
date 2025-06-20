@@ -38,7 +38,6 @@ import (
 	"github.com/jonboulle/clockwork"
 	"github.com/uber-go/tally"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"golang.org/x/time/rate"
 
 	"go.uber.org/cadence/.gen/go/shared"
@@ -168,7 +167,7 @@ func createPollRetryPolicy() backoff.RetryPolicy {
 
 func newBaseWorker(options baseWorkerOptions, logger *zap.Logger, metricsScope tally.Scope, sessionTokenBucket *sessionTokenBucket) *baseWorker {
 	ctx, cancel := context.WithCancel(context.Background())
-	logger = logger.With(zapcore.Field{Key: tagWorkerType, Type: zapcore.StringType, String: options.workerType})
+	logger = logger.With(zap.String(tagWorkerType, options.workerType))
 	metricsScope = tagScope(metricsScope, tagWorkerType, options.workerType)
 
 	concurrency := &worker.ConcurrencyLimit{
