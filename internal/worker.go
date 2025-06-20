@@ -193,6 +193,7 @@ type (
 		// cadence-server to retrieve activity tasks. Changing this value will affect the
 		// rate at which the worker is able to consume tasks from a task list.
 		// Default value is 2
+		// NOTE: if AutoScalerOptions.Enabled is set to true, this value will be ignored and AutoScalerOptions.PollerMaxCount will be used instead
 		MaxConcurrentActivityTaskPollers int
 
 		// optional: Sets the minimum number of goroutines that will concurrently poll the
@@ -200,7 +201,7 @@ type (
 		// rate at which the worker is able to consume tasks from a task list,
 		// unless FeatureFlags.PollerAutoScalerEnabled is set to true.
 		// Default value is 1
-		// Deprecated: Use AutoScalerOptions instead.
+		// Deprecated: No effect and use AutoScalerOptions instead.
 		MinConcurrentActivityTaskPollers int
 
 		// Optional: To set the maximum concurrent decision task executions this worker can have.
@@ -217,13 +218,14 @@ type (
 		// cadence-server to retrieve decision tasks. Changing this value will affect the
 		// rate at which the worker is able to consume tasks from a task list.
 		// Default value is 2
+		// NOTE: if AutoScalerOptions.Enabled is set to true, this value will be ignored and AutoScalerOptions.PollerMaxCount will be used instead
 		MaxConcurrentDecisionTaskPollers int
 
 		// optional: Sets the minimum number of goroutines that will concurrently poll the
 		// cadence-server to retrieve decision tasks. If FeatureFlags.PollerAutoScalerEnabled is set to true,
 		// changing this value will NOT affect the rate at which the worker is able to consume tasks from a task list.
 		// Default value is 2
-		// Deprecated: Use AutoScalerOptions instead.
+		// Deprecated: NO effect and use AutoScalerOptions instead.
 		MinConcurrentDecisionTaskPollers int
 
 		// optional: Sets the interval of poller autoscaling, between which poller autoscaler changes the poller count
