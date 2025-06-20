@@ -39,7 +39,8 @@ import (
 )
 
 const (
-	testTickTime = 1 * time.Second
+	testTickTime   = 1 * time.Second
+	testTimeFormat = time.TimeOnly
 )
 
 func createTestConcurrencyAutoScaler(t *testing.T, logger *zap.Logger, clock clockwork.Clock) *ConcurrencyAutoScaler {
@@ -303,11 +304,12 @@ func TestConcurrencyAutoScaler(t *testing.T) {
 			for _, event := range obs.FilterMessage(autoScalerEventLogMsg).All() {
 				if event.ContextMap()["event"] != string(autoScalerEventEmitMetrics) {
 					t.Log("event: ", event.ContextMap())
+
 					actualEvents = append(actualEvents, eventLog{
 						eventType:   autoScalerEvent(event.ContextMap()["event"].(string)),
 						enabled:     event.ContextMap()["enabled"].(bool),
 						pollerQuota: event.ContextMap()["poller_quota"].(int64),
-						time:        event.ContextMap()["time"].(time.Time).Format(testTimeFormat),
+						time:        event.Time.Format(testTimeFormat),
 					})
 				}
 			}

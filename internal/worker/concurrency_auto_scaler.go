@@ -48,7 +48,6 @@ const (
 	autoScalerEventStart                      autoScalerEvent = "auto-scaler-start"
 	autoScalerEventStop                       autoScalerEvent = "auto-scaler-stop"
 	autoScalerEventLogMsg                     string          = "concurrency auto scaler event"
-	testTimeFormat                            string          = "15:04:05"
 
 	metricsEnabled        = "enabled"
 	metricsDisabled       = "disabled"
@@ -136,12 +135,12 @@ func (c *ConcurrencyAutoScaler) Start() {
 	c.wg.Add(1)
 
 	go func() {
+		defer c.wg.Done()
 		defer func() {
 			if r := recover(); r != nil {
 				c.log.Error("panic in concurrency auto scaler, stopping the auto scaler", zap.Any("error", r))
 			}
 		}()
-		defer c.wg.Done()
 		ticker := c.clock.NewTicker(c.updateTick)
 		defer ticker.Stop()
 		for {
@@ -162,9 +161,11 @@ func (c *ConcurrencyAutoScaler) Stop() {
 	if c == nil {
 		return // no-op if auto scaler is not set
 	}
+	c.lock.Lock()
+	c.logEvent(autoScalerEventStop)
+	c.lock.Unlock()
 	close(c.shutdownChan)
 	c.wg.Wait()
-	c.logEvent(autoScalerEventStop)
 }
 
 // ProcessPollerHint reads the poller response hint and take actions in a transactional way

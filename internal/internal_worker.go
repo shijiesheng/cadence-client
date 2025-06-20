@@ -1290,6 +1290,7 @@ func AugmentWorkerOptions(options WorkerOptions) WorkerOptions {
 }
 
 func augmentAutoScalerOptions(options AutoScalerOptions) AutoScalerOptions {
+	// need at least 2 for sticky task polling to work
 	if options.PollerMinCount <= 1 {
 		options.PollerMinCount = defaultMinPollerSize
 	}
