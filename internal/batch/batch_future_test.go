@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 
@@ -91,7 +92,7 @@ func Test_BatchWorkflow(t *testing.T) {
 	env.RegisterActivity(batchActivity)
 
 	totalSize := 100
-	concurrency := 10
+	concurrency := 20
 
 	startTime := time.Now()
 	env.ExecuteWorkflow(batchWorkflow, batchWorkflowInput{
@@ -119,20 +120,23 @@ func Test_BatchWorkflow_Cancel(t *testing.T) {
 	env.RegisterActivity(batchActivity)
 
 	totalSize := 100
-	concurrency := 10
+	concurrency := 20
+
+	totalExpectedTime := time.Second * time.Duration(1+totalSize/concurrency)
+	wg := sync.WaitGroup{}
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		env.ExecuteWorkflow(batchWorkflow, batchWorkflowInput{
 			Concurrency: concurrency,
 			TotalSize:   totalSize,
 		})
 	}()
 
-	totalExpectedTime := time.Second * time.Duration(totalSize/concurrency)
-
 	time.Sleep(totalExpectedTime / 2)
 	env.CancelWorkflow()
 
-	time.Sleep(totalExpectedTime / 2)
+	wg.Wait() // wait for the workflow to complete otherwise test env will have race condition
 	assert.True(t, env.IsWorkflowCompleted())
 
 	err := env.GetWorkflowError()
