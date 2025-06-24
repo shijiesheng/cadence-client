@@ -309,7 +309,7 @@ func TestConcurrencyAutoScaler(t *testing.T) {
 						eventType:   autoScalerEvent(event.ContextMap()["event"].(string)),
 						enabled:     event.ContextMap()["enabled"].(bool),
 						pollerQuota: event.ContextMap()["poller_quota"].(int64),
-						time:        event.Time.Format(testTimeFormat),
+						time:        event.ContextMap()["time"].(time.Time).Format(testTimeFormat),
 					})
 				}
 			}
