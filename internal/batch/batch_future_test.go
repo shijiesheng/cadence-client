@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
-	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -211,9 +210,125 @@ func Test_Futures(t *testing.T) {
 	env.ExecuteWorkflow(futureTest)
 }
 
-func Test_valuePtr(t *testing.T) {
-	slices := make([]int, 10)
-	slicePtr := &slices
+func batchWorkflowAssignWithSlice(ctx internal.Context) ([]int, error) {
+	totalSize := 5
+	concurrency := 2
+	factories := make([]func(ctx internal.Context) internal.Future, totalSize)
+	for i := 0; i < totalSize; i++ {
+		i := i
+		factories[i] = func(ctx internal.Context) internal.Future {
+			aCtx := internal.WithActivityOptions(ctx, internal.ActivityOptions{
+				ScheduleToStartTimeout: time.Second * 10,
+				StartToCloseTimeout:    time.Second * 10,
+			})
+			return internal.ExecuteActivity(aCtx, batchActivity, i)
+		}
+	}
 
-	fmt.Println(reflect.ValueOf(slicePtr).Elem().Len())
+	batchFuture, err := NewBatchFuture(ctx, concurrency, factories)
+	if err != nil {
+		return nil, err
+	}
+
+	var valuePtr []int
+	if err := batchFuture.Get(ctx, &valuePtr); err != nil {
+		return nil, err
+	}
+	return valuePtr, nil
+}
+
+func batchWorkflowAssignWithSliceOfPointers(ctx internal.Context) ([]int, error) {
+	totalSize := 5
+	concurrency := 2
+	factories := make([]func(ctx internal.Context) internal.Future, totalSize)
+	for i := 0; i < totalSize; i++ {
+		i := i
+		factories[i] = func(ctx internal.Context) internal.Future {
+			aCtx := internal.WithActivityOptions(ctx, internal.ActivityOptions{
+				ScheduleToStartTimeout: time.Second * 10,
+				StartToCloseTimeout:    time.Second * 10,
+			})
+			return internal.ExecuteActivity(aCtx, batchActivity, i)
+		}
+	}
+	batchFuture, err := NewBatchFuture(ctx, concurrency, factories)
+	if err != nil {
+		return nil, err
+	}
+	var valuePtr []*int
+	if err := batchFuture.Get(ctx, &valuePtr); err != nil {
+		return nil, err
+	}
+
+	var result []int
+	for _, v := range valuePtr {
+		result = append(result, *v)
+	}
+	return result, nil
+}
+
+func batchWorkflowAssignWithNil(ctx internal.Context) ([]int, error) {
+	totalSize := 5
+	concurrency := 2
+	factories := make([]func(ctx internal.Context) internal.Future, totalSize)
+	for i := 0; i < totalSize; i++ {
+		i := i
+		factories[i] = func(ctx internal.Context) internal.Future {
+			aCtx := internal.WithActivityOptions(ctx, internal.ActivityOptions{
+				ScheduleToStartTimeout: time.Second * 10,
+				StartToCloseTimeout:    time.Second * 10,
+			})
+			return internal.ExecuteActivity(aCtx, batchActivity, i)
+		}
+	}
+
+	batchFuture, err := NewBatchFuture(ctx, concurrency, factories)
+	if err != nil {
+		return nil, err
+	}
+
+	var valuePtr []int
+	if err := batchFuture.Get(ctx, nil); err != nil {
+		return nil, err
+	}
+	return valuePtr, nil
+}
+
+func Test_BatchFuture_Get(t *testing.T) {
+	tests := []struct {
+		name     string
+		workflow func(ctx internal.Context) ([]int, error)
+		want     interface{}
+	}{
+		{
+			name:     "success with nil slice",
+			workflow: batchWorkflowAssignWithSlice,
+			want:     []int{0, 1, 2, 3, 4},
+		},
+		{
+			name:     "success with non-nil slice",
+			workflow: batchWorkflowAssignWithSliceOfPointers,
+			want:     []int{0, 1, 2, 3, 4},
+		},
+		{
+			name:     "success with nil",
+			workflow: batchWorkflowAssignWithNil,
+			want:     []int(nil),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testSuite := &testsuite.WorkflowTestSuite{}
+			env := testSuite.NewTestWorkflowEnvironment()
+			env.RegisterWorkflow(tt.workflow)
+			env.RegisterActivity(batchActivity)
+			env.ExecuteWorkflow(tt.workflow)
+			assert.True(t, env.IsWorkflowCompleted())
+			assert.Nil(t, env.GetWorkflowError())
+			var result []int
+			assert.Nil(t, env.GetWorkflowResult(&result))
+			assert.Equal(t, tt.want, result)
+		})
+	}
 }

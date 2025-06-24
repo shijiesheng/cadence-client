@@ -75,7 +75,7 @@ func (b *batchFutureImpl) start(ctx internal.Context) {
 			idx := idx
 
 			wgForFutures.Add(1)
-			internal.GoNamed(ctx, "batch-future-processor-one-future", func(ctx internal.Context) {
+			internal.GoNamed(ctx, fmt.Sprintf("batch-future-processor-one-future-%d", idx), func(ctx internal.Context) {
 				defer wgForFutures.Done()
 
 				// fork a future and chain it to the processed future for user to get the result
@@ -100,27 +100,33 @@ func (b *batchFutureImpl) IsReady() bool {
 	return true
 }
 
+// Get assigns the result of the futures to the valuePtr.
+// NOTE: valuePtr must be a pointer to a slice, or nil.
+// If valuePtr is a pointer to a slice, the slice will be resized to the length of the futures. Each element of the slice will be assigned with the underlying Future.Get() and thus behaves the same way.
+// If valuePtr is nil, no assignment will be made.
+// If error occurs, values will be set on successful futures and the errors of failed futures will be returned.
 func (b *batchFutureImpl) Get(ctx internal.Context, valuePtr interface{}) error {
-	// ensure valuePtr is a slice
-	var sliceValue reflect.Value
-	if valuePtr != nil {
-
-		switch v := reflect.ValueOf(valuePtr); v.Kind() {
-		case reflect.Ptr:
-			if v.Elem().Kind() != reflect.Slice {
-				return fmt.Errorf("valuePtr must be a pointer to a slice, got %v", v)
-			}
-			sliceValue = v.Elem()
-		case reflect.Slice:
-			sliceValue = v
-		default:
-			return fmt.Errorf("valuePtr must be a slice or a pointer to a slice, got %v", v.Kind())
+	// No assignment if valuePtr is nil
+	if valuePtr == nil {
+		b.wg.Wait(ctx)
+		var errs error
+		for i := range b.futures {
+			errs = multierr.Append(errs, b.futures[i].Get(ctx, nil))
 		}
-		// ensure slice size is the same as the number of futures
-		if sliceValue.Len() != len(b.futures) {
-			return fmt.Errorf("slice size must be the same as the number of futures, got %d, expected %d", sliceValue.Len(), len(b.futures))
-		}
+		return errs
 	}
+
+	v := reflect.ValueOf(valuePtr)
+	if v.Kind() != reflect.Ptr || v.Elem().Kind() != reflect.Slice {
+		return fmt.Errorf("valuePtr must be a pointer to a slice, got %v", v.Kind())
+	}
+
+	// resize the slice to the length of the futures
+	slice := v.Elem()
+	if slice.Cap() < len(b.futures) {
+		slice.Grow(len(b.futures) - slice.Cap())
+	}
+	slice.SetLen(len(b.futures))
 
 	// wait for all futures to be ready
 	b.wg.Wait(ctx)
@@ -128,21 +134,8 @@ func (b *batchFutureImpl) Get(ctx internal.Context, valuePtr interface{}) error 
 	// loop through all elements of valuePtr
 	var errs error
 	for i := range b.futures {
-		if valuePtr == nil {
-			errs = multierr.Append(errs, b.futures[i].Get(ctx, nil))
-		} else {
-			value := sliceValue.Index(i)
-			if value.Kind() != reflect.Ptr {
-				value = value.Addr()
-			}
-			// if value is nil, initialize it
-			if value.IsNil() {
-				value.Set(reflect.New(value.Type().Elem()))
-			}
-
-			e := b.futures[i].Get(ctx, value.Interface())
-			errs = multierr.Append(errs, e)
-		}
+		e := b.futures[i].Get(ctx, slice.Index(i).Addr().Interface())
+		errs = multierr.Append(errs, e)
 	}
 
 	return errs
