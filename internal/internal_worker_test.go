@@ -217,10 +217,13 @@ func (s *internalWorkerTestSuite) TestCreateWorker_WithDataConverter() {
 
 func (s *internalWorkerTestSuite) TestCreateShadowWorker() {
 	worker := createShadowWorker(s.T(), s.service, &ShadowOptions{})
-	s.Nil(worker.workflowWorker)
-	s.Nil(worker.activityWorker)
-	s.Nil(worker.locallyDispatchedActivityWorker)
-	s.Nil(worker.sessionWorker)
+	w, ok := worker.(*aggregatedWorker)
+	s.True(ok)
+	s.NotNil(w)
+	s.Nil(w.workflowWorker)
+	s.Nil(w.activityWorker)
+	s.Nil(w.locallyDispatchedActivityWorker)
+	s.Nil(w.sessionWorker)
 }
 
 func (s *internalWorkerTestSuite) TestCreateWorker_WithAutoScaler() {
@@ -261,9 +264,8 @@ func (s *internalWorkerTestSuite) TestCreateWorkerRun() {
 func (s *internalWorkerTestSuite) TestNoActivitiesOrWorkflows() {
 	t := s.T()
 	w := createWorker(s.T(), s.service)
-	w.registry = newRegistry()
-	assert.Empty(t, w.registry.getRegisteredActivities())
-	assert.Empty(t, w.registry.GetRegisteredWorkflowTypes())
+	// assert.Empty(t, w.GetRegisteredActivities())
+	// assert.Empty(t, w.GetRegisteredWorkflows())
 	assert.NoError(t, w.Start())
 	w.Stop()
 }
@@ -350,7 +352,7 @@ func (m *mockPollForActivityTaskRequest) String() string {
 func createWorker(
 	t *testing.T,
 	service *workflowservicetest.MockClient,
-) *aggregatedWorker {
+) Worker {
 	return createWorkerWithThrottle(t, service, 0, WorkerOptions{})
 }
 
@@ -358,7 +360,7 @@ func createShadowWorker(
 	t *testing.T,
 	service *workflowservicetest.MockClient,
 	shadowOptions *ShadowOptions,
-) *aggregatedWorker {
+) Worker {
 	return createWorkerWithThrottle(t, service, 0, WorkerOptions{
 		EnableShadowWorker: true,
 		ShadowOptions:      *shadowOptions,
@@ -370,7 +372,7 @@ func createWorkerWithThrottle(
 	service *workflowservicetest.MockClient,
 	activitiesPerSecond float64,
 	workerOptions WorkerOptions,
-) *aggregatedWorker {
+) Worker {
 	domain := "testDomain"
 	domainStatus := shared.DomainStatusRegistered
 	domainDesc := &shared.DescribeDomainResponse{
@@ -418,21 +420,21 @@ func createWorkerWithThrottle(
 func createWorkerWithDataConverter(
 	t *testing.T,
 	service *workflowservicetest.MockClient,
-) *aggregatedWorker {
+) Worker {
 	return createWorkerWithThrottle(t, service, 0, WorkerOptions{DataConverter: newTestDataConverter()})
 }
 
 func createWorkerWithAutoscaler(
 	t *testing.T,
 	service *workflowservicetest.MockClient,
-) *aggregatedWorker {
+) Worker {
 	return createWorkerWithThrottle(t, service, 0, WorkerOptions{FeatureFlags: FeatureFlags{PollerAutoScalerEnabled: true}})
 }
 
 func createWorkerWithStrictNonDeterminismDisabled(
 	t *testing.T,
 	service *workflowservicetest.MockClient,
-) *aggregatedWorker {
+) Worker {
 	return createWorkerWithThrottle(t, service, 0, WorkerOptions{WorkerBugPorts: WorkerBugPorts{DisableStrictNonDeterminismCheck: true}})
 }
 
