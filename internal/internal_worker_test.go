@@ -264,8 +264,8 @@ func (s *internalWorkerTestSuite) TestCreateWorkerRun() {
 func (s *internalWorkerTestSuite) TestNoActivitiesOrWorkflows() {
 	t := s.T()
 	w := createWorker(s.T(), s.service)
-	// assert.Empty(t, w.GetRegisteredActivities())
-	// assert.Empty(t, w.GetRegisteredWorkflows())
+	assert.Empty(t, w.GetRegisteredActivities())
+	assert.Empty(t, w.GetRegisteredWorkflows())
 	assert.NoError(t, w.Start())
 	w.Stop()
 }
@@ -292,6 +292,8 @@ func (s *internalWorkerTestSuite) TestWorkerStartFailsWithInvalidDomain() {
 			}).Times(2)
 
 		worker := createWorker(s.T(), service)
+		worker.RegisterWorkflow(testWorkflowSample) // at least register one workflow otherwise workflow worker will not be started
+		worker.RegisterActivity(testActivity)       // at least register one activity otherwise activity worker will not be started
 		if tc.isErrFatal {
 			err := worker.Start()
 			assert.Error(t, err, "worker.start() MUST fail when domain is invalid")
@@ -405,7 +407,7 @@ func createWorkerWithThrottle(
 	workerOptions.WorkerActivitiesPerSecond = 20
 	workerOptions.TaskListActivitiesPerSecond = activitiesPerSecond
 	workerOptions.Logger = testlogger.NewZap(t)
-	workerOptions.EnableSessionWorker = true
+	workerOptions.EnableSessionWorker = false
 
 	// Start Worker.
 	worker, err := NewWorker(
