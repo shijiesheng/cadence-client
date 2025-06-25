@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
-	"sync"
 	"testing"
 	"time"
 
@@ -16,6 +15,8 @@ import (
 	"go.uber.org/cadence/internal"
 	"go.uber.org/cadence/testsuite"
 )
+
+// TODO: add clock simulation to speed up the test
 
 type batchWorkflowInput struct {
 	Concurrency int
@@ -122,20 +123,15 @@ func Test_BatchWorkflow_Cancel(t *testing.T) {
 	concurrency := 20
 
 	totalExpectedTime := time.Second * time.Duration(1+totalSize/concurrency)
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		env.ExecuteWorkflow(batchWorkflow, batchWorkflowInput{
-			Concurrency: concurrency,
-			TotalSize:   totalSize,
-		})
-	}()
+	env.ExecuteWorkflow(batchWorkflow, batchWorkflowInput{
+		Concurrency: concurrency,
+		TotalSize:   totalSize,
+	})
 
-	time.Sleep(totalExpectedTime / 2)
-	env.CancelWorkflow()
+	env.RegisterDelayedCallback(func() {
+		env.CancelWorkflow()
+	}, totalExpectedTime/2)
 
-	wg.Wait() // wait for the workflow to complete otherwise test env will have race condition
 	assert.True(t, env.IsWorkflowCompleted())
 
 	err := env.GetWorkflowError()
