@@ -28,7 +28,13 @@ type BatchFuture interface {
 	GetFutures() []workflow.Future
 }
 
-// NewBatchFuture creates a new batch future
+// NewBatchFuture creates a bounded-concurrency helper for doing bulk work in your workflow.
+// It does not reduce the amount of history your workflow stores, so any event-count
+// or history-size limits are unaffected - you must still be cautious about the total
+// amount of work you do in any workflow.
+//
+// When NewBatchFuture is called, futures created by the factories will be started sequentially until the concurrency limit (batchSize) is reached.
+// The remaining futures will be queued and started as previous futures complete, maintaining the specified concurrency level.
 func NewBatchFuture(ctx workflow.Context, batchSize int, factories []func(ctx workflow.Context) workflow.Future) (BatchFuture, error) {
 	return batch.NewBatchFuture(ctx, batchSize, factories)
 }
