@@ -9,8 +9,8 @@ import (
 	"go.uber.org/cadence/internal"
 )
 
-// BatchFutureImpl is an implementation of BatchFuture
-type BatchFutureImpl struct {
+// BatchFuture is an implementation of public BatchFuture interface.
+type BatchFuture struct {
 	futures   []internal.Future
 	settables []internal.Settable
 	factories []func(ctx internal.Context) internal.Future
@@ -20,7 +20,7 @@ type BatchFutureImpl struct {
 	wg internal.WaitGroup
 }
 
-func NewBatchFuture(ctx internal.Context, batchSize int, factories []func(ctx internal.Context) internal.Future) (*BatchFutureImpl, error) {
+func NewBatchFuture(ctx internal.Context, batchSize int, factories []func(ctx internal.Context) internal.Future) (*BatchFuture, error) {
 	var futures []internal.Future
 	var settables []internal.Settable
 	for range factories {
@@ -29,7 +29,7 @@ func NewBatchFuture(ctx internal.Context, batchSize int, factories []func(ctx in
 		settables = append(settables, settable)
 	}
 
-	batchFuture := &BatchFutureImpl{
+	batchFuture := &BatchFuture{
 		futures:   futures,
 		settables: settables,
 		factories: factories,
@@ -41,11 +41,11 @@ func NewBatchFuture(ctx internal.Context, batchSize int, factories []func(ctx in
 	return batchFuture, nil
 }
 
-func (b *BatchFutureImpl) GetFutures() []internal.Future {
+func (b *BatchFuture) GetFutures() []internal.Future {
 	return b.futures
 }
 
-func (b *BatchFutureImpl) start(ctx internal.Context) {
+func (b *BatchFuture) start(ctx internal.Context) {
 
 	buffered := internal.NewBufferedChannel(ctx, b.batchSize) // buffered channel to limit the number of concurrent futures
 	channel := internal.NewNamedChannel(ctx, "batch-future-channel")
@@ -87,7 +87,7 @@ func (b *BatchFutureImpl) start(ctx internal.Context) {
 	})
 }
 
-func (b *BatchFutureImpl) IsReady() bool {
+func (b *BatchFuture) IsReady() bool {
 	for _, future := range b.futures {
 		if !future.IsReady() {
 			return false
@@ -101,7 +101,7 @@ func (b *BatchFutureImpl) IsReady() bool {
 // If valuePtr is a pointer to a slice, the slice will be resized to the length of the futures. Each element of the slice will be assigned with the underlying Future.Get() and thus behaves the same way.
 // If valuePtr is nil, no assignment will be made.
 // If error occurs, values will be set on successful futures and the errors of failed futures will be returned.
-func (b *BatchFutureImpl) Get(ctx internal.Context, valuePtr interface{}) error {
+func (b *BatchFuture) Get(ctx internal.Context, valuePtr interface{}) error {
 	// No assignment if valuePtr is nil
 	if valuePtr == nil {
 		b.wg.Wait(ctx)
