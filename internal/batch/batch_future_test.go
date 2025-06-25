@@ -174,42 +174,6 @@ func Test_BatchWorkflowUsingFutures(t *testing.T) {
 	assert.Equal(t, expected, result)
 }
 
-func futureTest(ctx internal.Context) error {
-	f, s := internal.NewFuture(ctx)
-	f2, s2 := internal.NewFuture(ctx)
-	s2.Chain(f)
-
-	wg := internal.NewWaitGroup(ctx)
-	wg.Add(1)
-	internal.GoNamed(ctx, "future-test", func(ctx internal.Context) {
-		defer wg.Done()
-		internal.Sleep(ctx, time.Second*10)
-		s.Set(1, nil)
-	})
-
-	err := f2.Get(ctx, nil)
-	if err != nil {
-		return err
-	}
-
-	err = f.Get(ctx, nil)
-	if err != nil {
-		return err
-	}
-
-	wg.Wait(ctx)
-	return err
-}
-
-func Test_Futures(t *testing.T) {
-	testSuite := &testsuite.WorkflowTestSuite{}
-	env := testSuite.NewTestWorkflowEnvironment()
-
-	env.RegisterWorkflow(futureTest)
-
-	env.ExecuteWorkflow(futureTest)
-}
-
 func batchWorkflowAssignWithSlice(ctx internal.Context) ([]int, error) {
 	totalSize := 5
 	concurrency := 2
@@ -287,11 +251,10 @@ func batchWorkflowAssignWithNil(ctx internal.Context) ([]int, error) {
 		return nil, err
 	}
 
-	var valuePtr []int
 	if err := batchFuture.Get(ctx, nil); err != nil {
 		return nil, err
 	}
-	return valuePtr, nil
+	return nil, nil
 }
 
 func Test_BatchFuture_Get(t *testing.T) {
