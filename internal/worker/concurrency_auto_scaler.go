@@ -111,7 +111,7 @@ func NewConcurrencyAutoScaler(input ConcurrencyAutoScalerInput) *ConcurrencyAuto
 		shutdownChan:             make(chan struct{}),
 		concurrency:              input.Concurrency,
 		cooldown:                 input.Cooldown,
-		log:                      input.Logger.Named(metrics.ConcurrencyAutoScalerScope),
+		log:                      input.Logger.With(zap.String("component", metrics.ConcurrencyAutoScalerScope)),
 		scope:                    input.Scope.SubScope(metrics.ConcurrencyAutoScalerScope),
 		clock:                    input.Clock,
 		updateTick:               tick,
@@ -175,13 +175,15 @@ func (c *ConcurrencyAutoScaler) ProcessPollerHint(hint *shared.AutoConfigHint) {
 	if c == nil {
 		return // no-op if auto scaler is not set
 	}
-	c.lock.Lock()
-	defer c.lock.Unlock()
 
 	if hint == nil {
 		return
 	}
-	if hint.PollerWaitTimeInMs != nil {
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	if hint.PollerWaitTimeInMs != nil && *hint.PollerWaitTimeInMs >= 0 {
 		waitTimeInMs := *hint.PollerWaitTimeInMs
 		c.pollerWaitTime.Add(time.Millisecond * time.Duration(waitTimeInMs))
 	}
@@ -201,7 +203,7 @@ func (c *ConcurrencyAutoScaler) ProcessPollerHint(hint *shared.AutoConfigHint) {
 	}
 }
 
-// resetConcurrency reset poller quota to the max value. This will be used for gracefully switching the auto scaler off to avoid workers stuck in the wrong state
+// resetConcurrency reset poller quota to the initial value. This will be used for gracefully switching the auto scaler off to avoid workers stuck in the wrong state
 func (c *ConcurrencyAutoScaler) resetConcurrency() {
 	c.concurrency.PollerPermit.SetQuota(c.pollerInitCount)
 }
@@ -215,7 +217,6 @@ func (c *ConcurrencyAutoScaler) logEvent(event autoScalerEvent) {
 	c.scope.Histogram(metricsPollerQuota, metricsPollerQuotaBuckets).RecordValue(float64(c.concurrency.PollerPermit.Quota()))
 	c.scope.Histogram(metricsPollerWaitTime, metricsPollerWaitTimeBuckets).RecordDuration(c.pollerWaitTime.Average())
 	c.log.Debug(autoScalerEventLogMsg,
-		zap.Time("time", c.clock.Now()),
 		zap.String("event", string(event)),
 		zap.Bool("enabled", c.enabled),
 		zap.Int("poller_quota", c.concurrency.PollerPermit.Quota()),
@@ -247,7 +248,6 @@ func (c *ConcurrencyAutoScaler) updatePollerPermit() {
 		c.logEvent(autoScalerEventPollerScaleDown)
 	} else {
 		c.logEvent(autoScalerEventPollerSkipUpdateNoChange)
-		return
 	}
 }
 
@@ -304,13 +304,13 @@ func newRollingAverage[T number](capacity int) *rollingAverage[T] {
 
 // Add always add positive numbers
 func (r *rollingAverage[T]) Add(value T) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	// no op on zero rolling window
 	if len(r.window) == 0 {
 		return
 	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
 	// replace the old value with the new value
 	r.sum += value - r.window[r.index]

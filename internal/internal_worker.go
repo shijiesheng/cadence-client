@@ -276,13 +276,9 @@ func newWorkflowTaskWorkerInternal(
 		domain,
 		params,
 	)
-	pollerCount := params.MaxConcurrentDecisionTaskPollers
-	if params.AutoScalerOptions.Enabled {
-		pollerCount = params.AutoScalerOptions.PollerMaxCount
-	}
 	worker := newBaseWorker(baseWorkerOptions{
 		pollerAutoScaler:  params.AutoScalerOptions,
-		pollerCount:       pollerCount,
+		pollerCount:       params.MaxConcurrentDecisionTaskPollers,
 		pollerRate:        defaultPollerRate,
 		maxConcurrentTask: params.MaxConcurrentDecisionTaskExecutionSize,
 		maxTaskPerSecond:  params.WorkerDecisionTasksPerSecond,

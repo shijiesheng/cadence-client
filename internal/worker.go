@@ -218,7 +218,7 @@ type (
 		// cadence-server to retrieve decision tasks. Changing this value will affect the
 		// rate at which the worker is able to consume tasks from a task list.
 		// Default value is 2
-		// NOTE: if AutoScalerOptions.Enabled is set to true, this value will be ignored and AutoScalerOptions.PollerMaxCount will be used instead
+		// NOTE: if AutoScalerOptions.Enabled is set to true, this value will be the initial value of poller count that scales automatically
 		MaxConcurrentDecisionTaskPollers int
 
 		// optional: Sets the minimum number of goroutines that will concurrently poll the

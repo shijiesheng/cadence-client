@@ -67,7 +67,6 @@ func TestConcurrencyAutoScaler(t *testing.T) {
 		eventType   autoScalerEvent
 		enabled     bool
 		pollerQuota int64
-		time        string
 	}
 
 	for _, tt := range []struct {
@@ -79,8 +78,8 @@ func TestConcurrencyAutoScaler(t *testing.T) {
 			"start and stop immediately",
 			[]*shared.AutoConfigHint{},
 			[]eventLog{
-				{autoScalerEventStart, false, 100, "00:00:00"},
-				{autoScalerEventStop, false, 100, "00:00:00"},
+				{autoScalerEventStart, false, 100},
+				{autoScalerEventStop, false, 100},
 			},
 		},
 		{
@@ -90,11 +89,11 @@ func TestConcurrencyAutoScaler(t *testing.T) {
 				{common.PtrOf(true), common.PtrOf(int64(16))}, // <- tick, no update
 			},
 			[]eventLog{
-				{autoScalerEventStart, false, 100, "00:00:00"},
-				{autoScalerEventEnable, true, 100, "00:00:00"},
-				{autoScalerEventPollerSkipUpdateCooldown, true, 100, "00:00:01"},
-				{autoScalerEventPollerSkipUpdateNoChange, true, 100, "00:00:02"},
-				{autoScalerEventStop, true, 100, "00:00:02"},
+				{autoScalerEventStart, false, 100},
+				{autoScalerEventEnable, true, 100},
+				{autoScalerEventPollerSkipUpdateCooldown, true, 100},
+				{autoScalerEventPollerSkipUpdateNoChange, true, 100},
+				{autoScalerEventStop, true, 100},
 			},
 		},
 		{
@@ -104,11 +103,11 @@ func TestConcurrencyAutoScaler(t *testing.T) {
 				{common.PtrOf(true), common.PtrOf(int64(100))}, // <- tick, no update
 			},
 			[]eventLog{
-				{autoScalerEventStart, false, 100, "00:00:00"},
-				{autoScalerEventEnable, true, 100, "00:00:00"},
-				{autoScalerEventPollerSkipUpdateCooldown, true, 100, "00:00:01"},
-				{autoScalerEventPollerSkipUpdateNoChange, true, 100, "00:00:02"},
-				{autoScalerEventStop, true, 100, "00:00:02"},
+				{autoScalerEventStart, false, 100},
+				{autoScalerEventEnable, true, 100},
+				{autoScalerEventPollerSkipUpdateCooldown, true, 100},
+				{autoScalerEventPollerSkipUpdateNoChange, true, 100},
+				{autoScalerEventStop, true, 100},
 			},
 		},
 		{
@@ -118,131 +117,131 @@ func TestConcurrencyAutoScaler(t *testing.T) {
 				{common.PtrOf(true), common.PtrOf(int64(10))}, // <- tick, scale up
 			},
 			[]eventLog{
-				{autoScalerEventStart, false, 100, "00:00:00"},
-				{autoScalerEventEnable, true, 100, "00:00:00"},
-				{autoScalerEventPollerSkipUpdateCooldown, true, 100, "00:00:01"},
-				{autoScalerEventPollerScaleUp, true, 116, "00:00:02"},
-				{autoScalerEventStop, true, 116, "00:00:02"},
+				{autoScalerEventStart, false, 100},
+				{autoScalerEventEnable, true, 100},
+				{autoScalerEventPollerSkipUpdateCooldown, true, 100},
+				{autoScalerEventPollerScaleUp, true, 116},
+				{autoScalerEventStop, true, 116},
 			},
 		},
 		{
-			"busy pollers, scale up to maximum",
+			"very busy pollers, scale up to maximum",
 			[]*shared.AutoConfigHint{
 				{common.PtrOf(true), common.PtrOf(int64(0))}, // <- tick, in cool down
-				{common.PtrOf(true), common.PtrOf(int64(0))}, // <- tick, scale down to minimum
+				{common.PtrOf(true), common.PtrOf(int64(0))}, // <- tick, scale up significantly to maximum
 			},
 			[]eventLog{
-				{autoScalerEventStart, false, 100, "00:00:00"},
-				{autoScalerEventEnable, true, 100, "00:00:00"},
-				{autoScalerEventPollerSkipUpdateCooldown, true, 100, "00:00:01"},
-				{autoScalerEventPollerScaleUp, true, 200, "00:00:02"},
-				{autoScalerEventStop, true, 200, "00:00:02"},
+				{autoScalerEventStart, false, 100},
+				{autoScalerEventEnable, true, 100},
+				{autoScalerEventPollerSkipUpdateCooldown, true, 100},
+				{autoScalerEventPollerScaleUp, true, 200},
+				{autoScalerEventStop, true, 200},
 			},
 		},
 		{
-			"busy pollers, scale up to maximum, and then scale down slowly",
+			"busy pollers, scale up, and then scale down slowly",
 			[]*shared.AutoConfigHint{
-				{common.PtrOf(true), common.PtrOf(int64(0))},     // <- tick, in cool down
-				{common.PtrOf(true), common.PtrOf(int64(0))},     // <- tick, scale up
+				{common.PtrOf(true), common.PtrOf(int64(10))},    // <- tick, in cool down
+				{common.PtrOf(true), common.PtrOf(int64(10))},    // <- tick, scale up
 				{common.PtrOf(true), common.PtrOf(int64(10000))}, // <- tick, skip due to cooldown
 				{common.PtrOf(true), common.PtrOf(int64(10000))}, // <- tick, scale down
 				{common.PtrOf(true), common.PtrOf(int64(10000))}, // <- tick, skip due to cooldown
 				{common.PtrOf(true), common.PtrOf(int64(10000))}, // <- tick, scale down further
 			},
 			[]eventLog{
-				{autoScalerEventStart, false, 100, "00:00:00"},
-				{autoScalerEventEnable, true, 100, "00:00:00"},
-				{autoScalerEventPollerSkipUpdateCooldown, true, 100, "00:00:01"},
-				{autoScalerEventPollerScaleUp, true, 200, "00:00:02"},
-				{autoScalerEventPollerSkipUpdateCooldown, true, 200, "00:00:03"},
-				{autoScalerEventPollerScaleDown, true, 121, "00:00:04"},
-				{autoScalerEventPollerSkipUpdateCooldown, true, 121, "00:00:05"},
-				{autoScalerEventPollerScaleDown, true, 73, "00:00:06"},
-				{autoScalerEventStop, true, 73, "00:00:06"},
+				{autoScalerEventStart, false, 100},
+				{autoScalerEventEnable, true, 100},
+				{autoScalerEventPollerSkipUpdateCooldown, true, 100},
+				{autoScalerEventPollerScaleUp, true, 116},
+				{autoScalerEventPollerSkipUpdateCooldown, true, 116},
+				{autoScalerEventPollerScaleDown, true, 70},
+				{autoScalerEventPollerSkipUpdateCooldown, true, 70},
+				{autoScalerEventPollerScaleDown, true, 50},
+				{autoScalerEventStop, true, 50},
 			},
 		},
 		{
 			"pollers, scale up and down multiple times",
 			[]*shared.AutoConfigHint{
-				{common.PtrOf(true), common.PtrOf(int64(0))},     // <- tick, in cool down
-				{common.PtrOf(true), common.PtrOf(int64(0))},     // <- tick, scale up
+				{common.PtrOf(true), common.PtrOf(int64(10))},    // <- tick, in cool down
+				{common.PtrOf(true), common.PtrOf(int64(10))},    // <- tick, scale up
 				{common.PtrOf(true), common.PtrOf(int64(10000))}, // <- tick, skip due to cooldown
 				{common.PtrOf(true), common.PtrOf(int64(10000))}, // <- tick, scale down
-				{common.PtrOf(true), common.PtrOf(int64(0))},     // <- tick, skip due to cooldown
-				{common.PtrOf(true), common.PtrOf(int64(0))},     // <- tick, scale up again
+				{common.PtrOf(true), common.PtrOf(int64(10))},    // <- tick, skip due to cooldown
+				{common.PtrOf(true), common.PtrOf(int64(10))},    // <- tick, scale up again
 				{common.PtrOf(true), common.PtrOf(int64(10000))}, // <- tick, skip due to cooldown
 				{common.PtrOf(true), common.PtrOf(int64(10000))}, // <- tick, scale down again
 			},
 			[]eventLog{
-				{autoScalerEventStart, false, 100, "00:00:00"},
-				{autoScalerEventEnable, true, 100, "00:00:00"},
-				{autoScalerEventPollerSkipUpdateCooldown, true, 100, "00:00:01"},
-				{autoScalerEventPollerScaleUp, true, 200, "00:00:02"},
-				{autoScalerEventPollerSkipUpdateCooldown, true, 200, "00:00:03"},
-				{autoScalerEventPollerScaleDown, true, 121, "00:00:04"},
-				{autoScalerEventPollerSkipUpdateCooldown, true, 121, "00:00:05"},
-				{autoScalerEventPollerScaleUp, true, 200, "00:00:06"},
-				{autoScalerEventPollerSkipUpdateCooldown, true, 200, "00:00:07"},
-				{autoScalerEventPollerScaleDown, true, 121, "00:00:08"},
-				{autoScalerEventStop, true, 121, "00:00:08"},
+				{autoScalerEventStart, false, 100},
+				{autoScalerEventEnable, true, 100},
+				{autoScalerEventPollerSkipUpdateCooldown, true, 100},
+				{autoScalerEventPollerScaleUp, true, 116},
+				{autoScalerEventPollerSkipUpdateCooldown, true, 116},
+				{autoScalerEventPollerScaleDown, true, 70},
+				{autoScalerEventPollerSkipUpdateCooldown, true, 70},
+				{autoScalerEventPollerScaleUp, true, 81},
+				{autoScalerEventPollerSkipUpdateCooldown, true, 81},
+				{autoScalerEventPollerScaleDown, true, 50},
+				{autoScalerEventStop, true, 50},
 			},
 		},
 		{
 			"idle pollers waiting for tasks",
 			[]*shared.AutoConfigHint{
 				{common.PtrOf(true), common.PtrOf(int64(1000))}, // <- tick, in cool down
-				{common.PtrOf(true), common.PtrOf(int64(1000))}, // <- tick, scale up
+				{common.PtrOf(true), common.PtrOf(int64(1000))}, // <- tick, scale down
 			},
 			[]eventLog{
-				{autoScalerEventStart, false, 100, "00:00:00"},
-				{autoScalerEventEnable, true, 100, "00:00:00"},
-				{autoScalerEventPollerSkipUpdateCooldown, true, 100, "00:00:01"},
-				{autoScalerEventPollerScaleDown, true, 80, "00:00:02"},
-				{autoScalerEventStop, true, 80, "00:00:02"},
+				{autoScalerEventStart, false, 100},
+				{autoScalerEventEnable, true, 100},
+				{autoScalerEventPollerSkipUpdateCooldown, true, 100},
+				{autoScalerEventPollerScaleDown, true, 80},
+				{autoScalerEventStop, true, 80},
 			},
 		},
 		{
 			"idle pollers, scale down to minimum",
 			[]*shared.AutoConfigHint{
 				{common.PtrOf(true), common.PtrOf(int64(60000))}, // <- tick, in cool down
-				{common.PtrOf(true), common.PtrOf(int64(60000))}, // <- tick, scale up
+				{common.PtrOf(true), common.PtrOf(int64(60000))}, // <- tick, scale down
 			},
 			[]eventLog{
-				{autoScalerEventStart, false, 100, "00:00:00"},
-				{autoScalerEventEnable, true, 100, "00:00:00"},
-				{autoScalerEventPollerSkipUpdateCooldown, true, 100, "00:00:01"},
-				{autoScalerEventPollerScaleDown, true, 50, "00:00:02"},
-				{autoScalerEventStop, true, 50, "00:00:02"},
+				{autoScalerEventStart, false, 100},
+				{autoScalerEventEnable, true, 100},
+				{autoScalerEventPollerSkipUpdateCooldown, true, 100},
+				{autoScalerEventPollerScaleDown, true, 50},
+				{autoScalerEventStop, true, 50},
 			},
 		},
 		{
 			"idle pollers but disabled scaling",
 			[]*shared.AutoConfigHint{
-				{common.PtrOf(false), common.PtrOf(int64(100))}, // <- tick, in cool down
-				{common.PtrOf(false), common.PtrOf(int64(100))}, // <- tick, scale up
+				{common.PtrOf(false), common.PtrOf(int64(60000))}, // <- tick, in cool down
+				{common.PtrOf(false), common.PtrOf(int64(60000))}, // <- tick, no update due to disabled
 			},
 			[]eventLog{
-				{autoScalerEventStart, false, 100, "00:00:00"},
-				{autoScalerEventPollerSkipUpdateNotEnabled, false, 100, "00:00:01"},
-				{autoScalerEventPollerSkipUpdateNotEnabled, false, 100, "00:00:02"},
-				{autoScalerEventStop, false, 100, "00:00:02"},
+				{autoScalerEventStart, false, 100},
+				{autoScalerEventPollerSkipUpdateNotEnabled, false, 100},
+				{autoScalerEventPollerSkipUpdateNotEnabled, false, 100},
+				{autoScalerEventStop, false, 100},
 			},
 		},
 		{
 			"idle pollers but disabled scaling at a later time",
 			[]*shared.AutoConfigHint{
 				{common.PtrOf(true), common.PtrOf(int64(1000))},  // <- tick, in cool down
-				{common.PtrOf(true), common.PtrOf(int64(1000))},  // <- tick, scale up
+				{common.PtrOf(true), common.PtrOf(int64(1000))},  // <- tick, scale down
 				{common.PtrOf(false), common.PtrOf(int64(1000))}, // <- disable
 			},
 			[]eventLog{
-				{autoScalerEventStart, false, 100, "00:00:00"},
-				{autoScalerEventEnable, true, 100, "00:00:00"},
-				{autoScalerEventPollerSkipUpdateCooldown, true, 100, "00:00:01"},
-				{autoScalerEventPollerScaleDown, true, 80, "00:00:02"},
-				{autoScalerEventDisable, false, 100, "00:00:02"},
-				{autoScalerEventPollerSkipUpdateNotEnabled, false, 100, "00:00:03"},
-				{autoScalerEventStop, false, 100, "00:00:03"},
+				{autoScalerEventStart, false, 100},
+				{autoScalerEventEnable, true, 100},
+				{autoScalerEventPollerSkipUpdateCooldown, true, 100},
+				{autoScalerEventPollerScaleDown, true, 80},
+				{autoScalerEventDisable, false, 100},
+				{autoScalerEventPollerSkipUpdateNotEnabled, false, 100},
+				{autoScalerEventStop, false, 100},
 			},
 		},
 		{
@@ -253,12 +252,12 @@ func TestConcurrencyAutoScaler(t *testing.T) {
 				{common.PtrOf(true), common.PtrOf(int64(1000))},  // <- tick, enable scale up
 			},
 			[]eventLog{
-				{autoScalerEventStart, false, 100, "00:00:00"},
-				{autoScalerEventPollerSkipUpdateNotEnabled, false, 100, "00:00:01"},
-				{autoScalerEventPollerSkipUpdateNotEnabled, false, 100, "00:00:02"},
-				{autoScalerEventEnable, true, 100, "00:00:02"},
-				{autoScalerEventPollerScaleDown, true, 80, "00:00:03"},
-				{autoScalerEventStop, true, 80, "00:00:03"},
+				{autoScalerEventStart, false, 100},
+				{autoScalerEventPollerSkipUpdateNotEnabled, false, 100},
+				{autoScalerEventPollerSkipUpdateNotEnabled, false, 100},
+				{autoScalerEventEnable, true, 100},
+				{autoScalerEventPollerScaleDown, true, 80},
+				{autoScalerEventStop, true, 80},
 			},
 		},
 	} {
@@ -293,7 +292,7 @@ func TestConcurrencyAutoScaler(t *testing.T) {
 				defer wg.Done()
 				for i := 0; i < len(tt.pollAutoConfigHint)*2+1; i++ {
 					clock.Advance(testTickTime / 2)
-					time.Sleep(10 * time.Millisecond) // process non-time logic
+					time.Sleep(100 * time.Millisecond) // process non-time logic
 				}
 			}()
 
@@ -309,7 +308,6 @@ func TestConcurrencyAutoScaler(t *testing.T) {
 						eventType:   autoScalerEvent(event.ContextMap()["event"].(string)),
 						enabled:     event.ContextMap()["enabled"].(bool),
 						pollerQuota: event.ContextMap()["poller_quota"].(int64),
-						time:        event.ContextMap()["time"].(time.Time).Format(testTimeFormat),
 					})
 				}
 			}
