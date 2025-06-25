@@ -20,7 +20,8 @@ type BatchFuture interface {
 	//
 	// Any errors encountered are merged with go.uber.org/multierr, so single errors are
 	// exposed normally, but multiple ones are bundled in the same way as errors.Join.
-	// For consistency when checking individual errors, consider using `multierr.Errors(err)` in all cases.
+	// For consistency when checking individual errors, consider using `multierr.Errors(err)` in all cases,
+	// or `GetFutures()[i].Get(ctx, nil)` to get the original errors at each index.
 	Get(ctx workflow.Context, valuePtr interface{}) error
 	// GetFutures returns a slice of all the wrapped futures.
 	// This slice MUST NOT be modified, but the individual futures can be used normally.
