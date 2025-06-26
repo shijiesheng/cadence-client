@@ -47,17 +47,17 @@ func (b *BatchFuture) GetFutures() []internal.Future {
 
 func (b *BatchFuture) start(ctx internal.Context) {
 
-	buffered := internal.NewBufferedChannel(ctx, b.batchSize) // buffered channel to limit the number of concurrent futures
-	channel := internal.NewNamedChannel(ctx, "batch-future-channel")
+	semaphore := internal.NewBufferedChannel(ctx, b.batchSize) // buffered workChan to limit the number of concurrent futures
+	workChan := internal.NewNamedChannel(ctx, "batch-future-channel")
 	b.wg.Add(1)
 	internal.GoNamed(ctx, "batch-future-submitter", func(ctx internal.Context) {
 		defer b.wg.Done()
 
 		for i := range b.factories {
-			buffered.Send(ctx, nil)
-			channel.Send(ctx, i)
+			semaphore.Send(ctx, nil)
+			workChan.Send(ctx, i)
 		}
-		channel.Close()
+		workChan.Close()
 	})
 
 	b.wg.Add(1)
@@ -67,7 +67,7 @@ func (b *BatchFuture) start(ctx internal.Context) {
 		wgForFutures := internal.NewWaitGroup(ctx)
 
 		var idx int
-		for channel.Receive(ctx, &idx) {
+		for workChan.Receive(ctx, &idx) {
 			idx := idx
 
 			wgForFutures.Add(1)
@@ -80,7 +80,7 @@ func (b *BatchFuture) start(ctx internal.Context) {
 
 				// error handling is not needed here because the result is chained to the settable
 				f.Get(ctx, nil)
-				buffered.Receive(ctx, nil)
+				semaphore.Receive(ctx, nil)
 			})
 		}
 		wgForFutures.Wait(ctx)

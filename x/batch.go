@@ -33,8 +33,8 @@ type BatchFuture interface {
 // or history-size limits are unaffected - you must still be cautious about the total
 // amount of work you do in any workflow.
 //
-// When NewBatchFuture is called, futures created by the factories will be started sequentially until the concurrency limit (batchSize) is reached.
-// The remaining futures will be queued and started as previous futures complete, maintaining the specified concurrency level.
+// When NewBatchFuture is called, futures created by the factories will be started concurrently until the concurrency limit (batchSize) is reached.
+// The remaining factories will be queued and started as previous futures complete, maintaining the specified concurrency level.
 func NewBatchFuture(ctx workflow.Context, batchSize int, factories []func(ctx workflow.Context) workflow.Future) (BatchFuture, error) {
 	return batch.NewBatchFuture(ctx, batchSize, factories)
 }
