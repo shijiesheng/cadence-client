@@ -29,6 +29,7 @@ const (
 	defaultPollerAutoScalerCooldown           = 10 * time.Second
 	defaultMinPollerSize                      = 2
 	defaultMaxPollerSize                      = 20
+	defaultInitPollerSize                     = 2
 	defaultPollerAutoScalerWaitTimeUpperBound = 256 * time.Millisecond
 	defaultPollerAutoScalerWaitTimeLowerBound = 16 * time.Millisecond
 )
@@ -48,8 +49,12 @@ type (
 		PollerMinCount int
 
 		// Optional: The maximum number of pollers to start with.
-		// default: 200
+		// default: 20
 		PollerMaxCount int
+
+		// Optional: The initial number of pollers to start with.
+		// default: 2
+		PollerInitCount int
 
 		// Optional: The upper bound of poller wait time for poller autoscaler to scale down.
 		// default: 256ms
