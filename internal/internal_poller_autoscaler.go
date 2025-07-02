@@ -28,7 +28,7 @@ import (
 const (
 	defaultPollerAutoScalerCooldown           = 10 * time.Second
 	defaultMinPollerSize                      = 2
-	defaultMaxPollerSize                      = 200
+	defaultMaxPollerSize                      = 20
 	defaultPollerAutoScalerWaitTimeUpperBound = 256 * time.Millisecond
 	defaultPollerAutoScalerWaitTimeLowerBound = 16 * time.Millisecond
 )

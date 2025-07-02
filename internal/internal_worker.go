@@ -468,14 +468,10 @@ func newActivityTaskWorker(
 	workerType string,
 ) (worker *activityWorker) {
 	ensureRequiredParams(&workerParams)
-	pollerCount := workerParams.MaxConcurrentActivityTaskPollers
-	if workerParams.AutoScalerOptions.Enabled {
-		pollerCount = workerParams.AutoScalerOptions.PollerMaxCount
-	}
 	base := newBaseWorker(
 		baseWorkerOptions{
 			pollerAutoScaler:  workerParams.AutoScalerOptions,
-			pollerCount:       pollerCount,
+			pollerCount:       workerParams.MaxConcurrentActivityTaskPollers,
 			pollerRate:        defaultPollerRate,
 			maxConcurrentTask: workerParams.MaxConcurrentActivityExecutionSize,
 			maxTaskPerSecond:  workerParams.WorkerActivitiesPerSecond,
