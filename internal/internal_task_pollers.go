@@ -1065,7 +1065,6 @@ func (atp *activityTaskPoller) poll(ctx context.Context) (*s.PollForActivityTask
 		TaskListMetadata: &s.TaskListMetadata{MaxTasksPerSecond: &atp.activitiesPerSecond},
 	}
 	response, err := atp.service.PollForActivityTask(ctx, request, getYarpcCallOptions(atp.featureFlags)...)
-	atp.logger.Info("poll for activity task", zap.Any("response", response))
 
 	if err != nil {
 		retryable := isServiceTransientError(err)

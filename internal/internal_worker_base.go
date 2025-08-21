@@ -343,7 +343,7 @@ func (bw *baseWorker) pollTask() {
 		} else {
 			bw.retrier.Succeeded()
 			if t, ok := task.(autoConfigHintAwareTask); ok {
-				bw.logger.Info("processing auto config hint", zap.Any("wait_time", t))
+				bw.logger.Info("processing auto config hint", zap.Any("hint", t.getAutoConfigHint()))
 				bw.concurrencyAutoScaler.ProcessPollerHint(t.getAutoConfigHint())
 			}
 		}
